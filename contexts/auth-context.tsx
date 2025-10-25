@@ -40,17 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.error("[Auth] Error creating Supabase client:", error)
     setLoading(false)
     return (
-      <AuthContext.Provider value={{
-        user: null,
-        isAuthenticated: false,
-        loading: false,
-        login: async () => false,
-        logout: async () => {},
-        signOut: async () => {},
-        signup: async () => false,
-      }}>
-        {children}
-      </AuthContext.Provider>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Configuration Error</h2>
+          <p className="text-gray-600 mb-4">Missing Supabase environment variables</p>
+          <p className="text-sm text-gray-500">
+            Please check your environment configuration and try again.
+          </p>
+        </div>
+      </div>
     )
   }
 

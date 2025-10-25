@@ -4,6 +4,7 @@ import { LoginForm } from "@/components/auth/login-form"
 import { StudentDashboard } from "@/components/dashboard/student-dashboard"
 import { FacultyDashboard } from "@/components/dashboard/faculty-dashboard"
 import { FullScreenLoader } from "@/components/ui/full-screen-loader"
+import { ErrorBoundary } from "@/components/ui/error-boundary"
 import { useAuth } from "@/hooks/use-auth"
 import { AuthProvider } from "@/contexts/auth-context"
 
@@ -33,8 +34,10 @@ function AppContent() {
 
 export default function Home() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
