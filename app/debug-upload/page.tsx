@@ -200,7 +200,7 @@ export default function DebugUploadPage() {
                 <li>If any tests show "error", check the Supabase dashboard</li>
                 <li>Make sure the database setup script has been run</li>
                 <li>Check that you're logged in as a valid user</li>
-                <li>Try uploading a small image file (< 1MB)</li>
+                <li>Try uploading a small image file (&lt; 1MB)</li>
                 <li>Check browser console for additional errors</li>
               </ul>
             </div>
