@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,11 @@ export default function DebugUploadPage() {
   const { user } = useAuth()
   const [diagnostics, setDiagnostics] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const runDiagnostics = async () => {
     setLoading(true)
@@ -21,7 +26,6 @@ export default function DebugUploadPage() {
     const supabase = createClient()
 
     try {
-      // Test 1: Check authentication
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       results.push({
         test: "Authentication",
@@ -30,7 +34,6 @@ export default function DebugUploadPage() {
         details: authError?.message || "OK"
       })
 
-      // Test 2: Check storage buckets
       const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
       const avatarsBucket = buckets?.find(b => b.id === 'avatars')
       results.push({
@@ -40,7 +43,6 @@ export default function DebugUploadPage() {
         details: bucketsError?.message || "OK"
       })
 
-      // Test 3: Check storage policies
       const { data: policies, error: policiesError } = await supabase
         .from('pg_policies')
         .select('policyname')
@@ -54,7 +56,6 @@ export default function DebugUploadPage() {
         details: policiesError?.message || "OK"
       })
 
-      // Test 4: Check profiles table
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, avatar_url')
@@ -68,10 +69,8 @@ export default function DebugUploadPage() {
         details: profileError?.message || "OK"
       })
 
-      // Test 5: Test file upload (small test)
       if (user?.id) {
         try {
-          // Create a small test file
           const testContent = "test"
           const testFile = new File([testContent], "test.txt", { type: "text/plain" })
           
@@ -86,7 +85,6 @@ export default function DebugUploadPage() {
             details: uploadError?.message || "OK"
           })
 
-          // Clean up test file
           if (uploadData?.path) {
             await supabase.storage.from('avatars').remove([uploadData.path])
           }
@@ -137,6 +135,29 @@ export default function DebugUploadPage() {
       default:
         return "bg-gray-50 text-gray-700 border-gray-200"
     }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-6 w-6" />
+                Profile Photo Upload Diagnostics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                <p className="mt-2 text-gray-600">Loading...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (
