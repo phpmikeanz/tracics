@@ -78,35 +78,36 @@ export function StudentDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="bg-primary p-2 rounded-lg">
-                <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-6 w-6 sm:h-8 sm:w-8" />
+        <div className="container-responsive">
+          <div className="flex justify-between items-center h-16 sm:h-18 lg:h-20">
+            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+              <div className="bg-primary p-2 sm:p-3 rounded-lg">
+                <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10 high-dpi" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-lg sm:text-xl font-semibold text-foreground">TTRAC</h1>
-                <p className="text-xs text-muted-foreground">Institute Computing Studies</p>
-                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 mt-1">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-foreground">TTRAC</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">Institute Computing Studies</p>
+                <Badge variant="outline" className="text-xs sm:text-sm bg-blue-50 text-blue-700 border-blue-200 mt-1">
                   Student Account
                 </Badge>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
               <NotificationCenter />
               <SimpleUserNav />
               
-              {/* Hamburger Menu Button - Always visible */}
+              {/* Hamburger Menu Button - Always visible on all devices */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="touch-target"
               >
                 {isMobileMenuOpen ? (
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5 sm:h-6 sm:w-6" />
                 ) : (
-                  <Menu className="h-5 w-5" />
+                  <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
                 )}
               </Button>
             </div>
@@ -114,7 +115,7 @@ export function StudentDashboard() {
 
           {/* Hamburger Menu Dropdown - Right side positioned */}
           {isMobileMenuOpen && (
-            <div className="absolute right-4 top-16 w-64 bg-card border border-border rounded-lg shadow-lg z-50">
+            <div className="absolute right-4 top-16 sm:top-18 lg:top-20 w-64 sm:w-72 bg-card border border-border rounded-lg shadow-lg z-50">
               <div className="py-2 space-y-1">
                 {tabs.map((tab) => (
                   <button
@@ -123,14 +124,14 @@ export function StudentDashboard() {
                       setActiveTab(tab.id)
                       setIsMobileMenuOpen(false)
                     }}
-                    className={`w-full text-left text-sm font-medium px-4 py-3 rounded-md transition-colors ${
+                    className={`w-full text-left text-sm sm:text-base font-medium px-4 py-3 sm:py-4 rounded-md transition-colors touch-target ${
                       activeTab === tab.id
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <tab.icon className="h-4 w-4" />
+                      <tab.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                       {tab.label}
                     </div>
                   </button>
@@ -141,7 +142,7 @@ export function StudentDashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="container-responsive padding-responsive-y">
         {activeTab === "overview" && (
           <>
             {loading ? (
@@ -156,14 +157,14 @@ export function StudentDashboard() {
               </div>
             ) : (
               <>
-                <div className="mb-6 sm:mb-8">
-                  <h2 className="text-xl sm:text-2xl font-bold text-foreground">Welcome back, {user?.full_name || user?.name}!</h2>
-                  <p className="text-muted-foreground text-sm sm:text-base mt-1">
+                <div className="mb-6 sm:mb-8 lg:mb-10">
+                  <h2 className="text-responsive-xl font-bold text-foreground">Welcome back, {user?.full_name || user?.name}!</h2>
+                  <p className="text-muted-foreground text-responsive-sm mt-1">
                     Here's what's happening in your courses today.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid-responsive-3">
                   {/* Courses */}
                   <Card className="lg:col-span-1 xl:col-span-2">
                     <CardHeader className="pb-4">

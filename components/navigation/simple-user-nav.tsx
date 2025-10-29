@@ -23,23 +23,35 @@ export function SimpleUserNav() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      {/* Clickable Avatar with Name */}
-      <SimpleClickableAvatar 
-        size="md" 
-        showName={true}
-        className="hover:bg-gray-50 p-2 rounded-md"
-      />
+    <div className="flex items-center gap-2 sm:gap-3">
+      {/* Clickable Avatar with Name - Hidden on mobile */}
+      <div className="hidden sm:block">
+        <SimpleClickableAvatar 
+          size="md" 
+          showName={true}
+          className="hover:bg-gray-50 p-2 rounded-md touch-target"
+        />
+      </div>
+      
+      {/* Mobile: Avatar only */}
+      <div className="sm:hidden">
+        <SimpleClickableAvatar 
+          size="sm" 
+          showName={false}
+          className="hover:bg-gray-50 p-2 rounded-md touch-target"
+        />
+      </div>
       
       {/* Logout Button */}
       <Button
         onClick={handleLogout}
         variant="ghost"
         size="sm"
-        className="text-gray-600 hover:text-gray-900"
+        className="text-gray-600 hover:text-gray-900 touch-target"
       >
-        <span className="mr-1">[→]</span>
-        Logout
+        <span className="mr-1 hidden sm:inline">[→]</span>
+        <span className="sm:hidden">[→]</span>
+        <span className="hidden sm:inline">Logout</span>
       </Button>
     </div>
   )
