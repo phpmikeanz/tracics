@@ -6,6 +6,12 @@ export interface FileUploadResult {
   error?: string
 }
 
+export interface FileUploadProgress {
+  loaded: number
+  total: number
+  percentage: number
+}
+
 // Fallback: Convert file to base64 data URL
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -19,7 +25,8 @@ function fileToBase64(file: File): Promise<string> {
 export async function uploadAssignmentFile(
   file: File,
   studentId: string,
-  assignmentId: string
+  assignmentId: string,
+  onProgress?: (progress: FileUploadProgress) => void
 ): Promise<FileUploadResult> {
   try {
     console.log('Starting file upload:', { fileName: file.name, fileSize: file.size, studentId, assignmentId })
@@ -73,6 +80,16 @@ export async function uploadAssignmentFile(
           return { success: false, error: 'File too large and storage not available. Please use a smaller file.' }
         }
         
+        // Simulate progress for base64 conversion
+        if (onProgress) {
+          onProgress({ loaded: 0, total: file.size, percentage: 0 })
+          // Simulate progress steps
+          for (let i = 0; i <= 100; i += 10) {
+            await new Promise(resolve => setTimeout(resolve, 50))
+            onProgress({ loaded: (file.size * i) / 100, total: file.size, percentage: i })
+          }
+        }
+        
         const base64Data = await fileToBase64(file)
         return {
           success: true,
@@ -83,7 +100,24 @@ export async function uploadAssignmentFile(
       console.log('Bucket created successfully:', newBucket)
     }
 
-    // Upload file to Supabase storage
+    // Upload file to Supabase storage with progress simulation
+    if (onProgress) {
+      onProgress({ loaded: 0, total: file.size, percentage: 0 })
+      
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        const currentProgress = Math.min(90, Math.random() * 30 + 10) // Random progress between 10-90%
+        onProgress({ 
+          loaded: (file.size * currentProgress) / 100, 
+          total: file.size, 
+          percentage: currentProgress 
+        })
+      }, 200)
+      
+      // Clear interval after upload completes
+      setTimeout(() => clearInterval(progressInterval), 2000)
+    }
+    
     const { data, error } = await supabase.storage
       .from('assignment-files')
       .upload(filePath, file, {
@@ -97,6 +131,11 @@ export async function uploadAssignmentFile(
     }
 
     console.log('Upload successful:', data)
+
+    // Update progress to 100%
+    if (onProgress) {
+      onProgress({ loaded: file.size, total: file.size, percentage: 100 })
+    }
 
     // Get public URL
     const { data: publicData } = supabase.storage

@@ -44,6 +44,50 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   
+  // Set quiz ID in window for debugging
+  if (typeof window !== 'undefined') {
+    (window as any).currentQuizId = quiz.id
+  }
+
+  // Safe shuffle function with seed for consistent randomization per student
+  const safeShuffleArray = (array: any[], seed?: string): any[] => {
+    if (!array || array.length === 0) return array
+    
+    // Create a deep copy to avoid modifying original
+    const shuffled = JSON.parse(JSON.stringify(array))
+    
+    // Use seed for consistent randomization (same student = same order)
+    let random = seed ? seededRandom(seed) : Math.random
+    
+    // Fisher-Yates shuffle algorithm
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1))
+      // Safe swap using temporary variable
+      const temp = shuffled[i]
+      shuffled[i] = shuffled[j]
+      shuffled[j] = temp
+    }
+    
+    return shuffled
+  }
+
+  // Seeded random number generator for consistent shuffling
+  const seededRandom = (seed: string) => {
+    let hash = 0
+    for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    
+    let current = Math.abs(hash)
+    return () => {
+      current = (current * 9301 + 49297) % 233280
+      return current / 233280
+    }
+  }
+
+  
   // Calculate time remaining based on started_at timestamp (persistent timer)
   const calculateTimeRemaining = () => {
     if (!attempt.started_at || !quiz.time_limit) return 0
@@ -91,47 +135,7 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set())
   const [manualGrades, setManualGrades] = useState<Database["public"]["Tables"]["quiz_question_grades"]["Row"][]>([])
 
-  // Seeded random number generator for consistent shuffling
-  const seededRandom = (seed: string) => {
-    let hash = 0
-    for (let i = 0; i < seed.length; i++) {
-      const char = seed.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
-      hash = hash & hash // Convert to 32-bit integer
-    }
-    return () => {
-      hash = (hash * 9301 + 49297) % 233280
-      return hash / 233280
-    }
-  }
 
-  // Shuffle array function using Fisher-Yates algorithm with seed
-  const shuffleArray = <T,>(array: T[], seed?: string): T[] => {
-    const shuffled = [...array]
-    const random = seed ? seededRandom(seed) : Math.random
-    
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(random() * (i + 1))
-      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-    }
-    return shuffled
-  }
-
-  // Shuffle multiple choice options within questions
-  const shuffleQuestionOptions = (questions: QuizQuestion[], seed?: string): QuizQuestion[] => {
-    return questions.map((question, index) => {
-      if (question.type === 'multiple_choice' && question.options && question.options.length > 1) {
-        // Use question ID and index as seed for consistent option shuffling
-        const optionSeed = seed ? `${seed}-${question.id}-${index}` : undefined
-        const shuffledOptions = shuffleArray(question.options, optionSeed)
-        return {
-          ...question,
-          options: shuffledOptions
-        }
-      }
-      return question
-    })
-  }
 
   // Check for quiz expiration when component mounts
   useEffect(() => {
@@ -215,71 +219,82 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
     const loadQuestions = async () => {
       try {
         setLoading(true)
+        console.log('🚀 ULTRA SIMPLE FIX - LOADING QUESTIONS DIRECTLY')
+        console.log('🚀 VERSION: 2.0 - NO SHUFFLE CODE!')
+        console.log('🚀 TIMESTAMP:', new Date().toISOString())
+        console.log('🚀 QUIZ ID:', quiz.id)
+        console.log('🚀 THIS IS THE NEW VERSION - NO SHUFFLE CODE!')
+        console.log('🚀 CACHE BUSTER:', Math.random().toString(36).substring(7))
+        
         const questions = await getQuizQuestions(quiz.id)
+        console.log('🚀 ULTRA DEBUG - QUESTIONS FROM DATABASE:', questions)
+        console.log('🚀 ULTRA DEBUG - QUESTIONS COUNT:', questions.length)
+        console.log('🚀 ULTRA DEBUG - QUESTIONS TYPE:', typeof questions)
+        console.log('🚀 ULTRA DEBUG - IS ARRAY:', Array.isArray(questions))
+        console.log('🚀 ULTRA DEBUG - QUESTION IDS:', questions?.map(q => q.id) || [])
         
-        console.log('Questions received from getQuizQuestions:', questions)
-        console.log('Questions length:', questions.length)
-        console.log('Quiz ID being used:', quiz.id)
+        // Check if there's any shuffle code still running
+        console.log('🚀 ULTRA DEBUG - NO SHUFFLE CODE SHOULD BE RUNNING!')
         
-        if (questions.length === 0) {
-          console.error('No questions found for quiz:', quiz.id)
-          console.error('This could be due to:')
-          console.error('1. Quiz ID mismatch')
-          console.error('2. RLS policy blocking access')
-          console.error('3. Database connection issue')
-          console.error('4. Questions not properly linked to quiz')
-          
-          // Try to debug the issue
-          try {
-            const { debugQuizQuestions } = await import('@/lib/quizzes')
-            const debugResult = await debugQuizQuestions(quiz.id)
-            console.log('Debug result:', debugResult)
-          } catch (debugError) {
-            console.error('Debug failed:', debugError)
-          }
-          
+        if (!questions || questions.length === 0) {
+          console.error('❌ NO QUESTIONS RECEIVED FROM DATABASE!')
           toast({
-            title: "No Questions Available",
-            description: "This quiz doesn't have any questions yet, or you may not have access. Please contact your instructor.",
+            title: "No Questions",
+            description: "No questions found for this quiz.",
             variant: "destructive",
           })
           return
         }
         
-        // Use attempt ID as seed for consistent shuffling across page refreshes
-        const shuffleSeed = attempt.id
+        // Shuffle questions and options to prevent copying
+        console.log('🔄 SHUFFLING QUESTIONS TO PREVENT COPYING...')
+        console.log('Original questions count:', questions.length)
         
-        // Shuffle questions for each student attempt
-        const shuffledQuestions = shuffleArray(questions, shuffleSeed)
+        // Create unique seed for this student and quiz
+        const shuffleSeed = `${user?.id}-${quiz.id}-${attempt.id}`
+        console.log('🎲 Shuffle seed:', shuffleSeed)
         
-        // Also shuffle multiple choice options within each question
-        const fullyShuffledQuestions = shuffleQuestionOptions(shuffledQuestions, shuffleSeed)
+        // Shuffle question order using student-specific seed
+        const shuffledQuestions = safeShuffleArray(questions, shuffleSeed)
+        console.log('Shuffled questions count:', shuffledQuestions.length)
         
-        console.log('Questions shuffled for student attempt:', {
-          attemptId: attempt.id,
-          originalOrder: questions.map(q => q.id),
-          shuffledOrder: fullyShuffledQuestions.map(q => q.id)
+        // Shuffle options for each question using question-specific seed
+        const finalQuestions = shuffledQuestions.map((question, index) => {
+          if (question.type === 'multiple_choice' || question.type === 'true_false') {
+            const optionSeed = `${shuffleSeed}-${question.id}-${index}`
+            return {
+              ...question,
+              options: safeShuffleArray(question.options || [], optionSeed)
+            }
+          }
+          return question
         })
         
-        setQuizState(prev => ({ ...prev, questions: fullyShuffledQuestions }))
-      } catch (error) {
-        console.error('Error loading quiz questions:', error)
+        console.log('✅ FINAL QUESTIONS WITH SHUFFLING:', finalQuestions.length)
+        console.log('Setting shuffled questions in state:', finalQuestions)
         
-        let errorMessage = "Failed to load quiz questions. Please try again."
-        
-        if (error instanceof Error) {
-          if (error.message.includes('not enrolled')) {
-            errorMessage = "You are not enrolled in this course or your enrollment is not approved."
-          } else if (error.message.includes('Quiz not found')) {
-            errorMessage = "This quiz is no longer available."
-          } else if (error.message.includes('Cannot access quiz')) {
-            errorMessage = "You don't have permission to access this quiz."
+        // Set shuffled questions
+        setQuizState(prev => {
+          console.log('Previous state questions count:', prev.questions?.length || 0)
+          console.log('Setting new shuffled questions count:', finalQuestions.length)
+          return {
+            ...prev,
+            questions: finalQuestions
           }
-        }
+        })
         
+        console.log('🎉 QUESTIONS SET - COUNT:', questions.length)
+        
+        // Verify the state was set
+        setTimeout(() => {
+          console.log('🔍 VERIFICATION - Current state questions count:', quizState.questions?.length || 0)
+        }, 100)
+        
+      } catch (error) {
+        console.error('❌ ERROR LOADING QUESTIONS:', error)
         toast({
           title: "Error",
-          description: errorMessage,
+          description: "Failed to load quiz questions. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -299,14 +314,14 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         
         // Auto-submit when time runs out
         if (remaining === 0) {
-          console.log('Time expired, triggering auto-submit with current answers:', quizState.answers)
+          console.log('Time expired, triggering auto-submit')
           handleAutoSubmitQuiz()
         }
       }, 1000)
       
       return () => clearInterval(timer)
     }
-  }, [quizState.isSubmitted, quizState.isAutoSubmitting, quizState.answers])
+  }, [quizState.isSubmitted, quizState.isAutoSubmitting]) // Removed quizState.answers from dependencies
 
   // Warning effects for low time
   useEffect(() => {
@@ -413,56 +428,26 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       console.log('Final save before manual submission:', quizState.answers)
       await saveQuizAnswers(attempt.id, quizState.answers)
       
-      // Submit the quiz
+      // Submit the quiz - this will trigger database notifications automatically
       await submitQuizAttempt(attempt.id, quizState.answers)
       
-      // Enhanced faculty notification for quiz completion
+      // Additional activity tracking (database triggers handle the main notifications)
       if (user?.id && quiz.course_id) {
         try {
-          const supabase = require("@/lib/supabase/client").createClient()
+          // Track student activity for comprehensive monitoring
+          await trackStudentActivity(
+            user.id,
+            quiz.course_id,
+            'quiz_completed',
+            {
+              quizTitle: quiz.title,
+              completedAt: new Date().toISOString()
+            }
+          )
           
-          // Get course and student information
-          const { data: courseData, error: courseError } = await supabase
-            .from("courses")
-            .select("instructor_id, title")
-            .eq("id", quiz.course_id)
-            .single()
-
-          const { data: studentData } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", user.id)
-            .single()
-
-          if (!courseError && courseData?.instructor_id) {
-            const studentName = studentData?.full_name || "Student"
-            const courseTitle = courseData.title || "Course"
-            const completedAt = new Date().toISOString()
-            
-            // Notify faculty about quiz completion
-            await notifyFacultyQuizCompleted(
-              courseData.instructor_id,
-              studentName,
-              quiz.title,
-              courseTitle,
-              completedAt
-            )
-            
-            // Track student activity for comprehensive monitoring
-            await trackStudentActivity(
-              user.id,
-              quiz.course_id,
-              'quiz_completed',
-              {
-                quizTitle: quiz.title,
-                completedAt: completedAt
-              }
-            )
-            
-            console.log("Enhanced faculty notification sent for quiz completion:", quiz.title)
-          }
-        } catch (notificationError) {
-          console.log("Enhanced notification failed, but quiz was submitted:", notificationError)
+          console.log("Student activity tracked for quiz completion:", quiz.title)
+        } catch (activityError) {
+          console.log("Activity tracking failed, but quiz was submitted:", activityError)
         }
       }
       
@@ -489,6 +474,12 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   }
 
   const handleAutoSubmitQuiz = async () => {
+    // Prevent multiple auto-submissions
+    if (quizState.isAutoSubmitting || quizState.isSubmitted) {
+      console.log('Auto-submit already in progress or quiz already submitted, skipping')
+      return
+    }
+    
     try {
       // Set auto-submitting state to prevent multiple submissions
       setQuizState((prev) => ({ ...prev, isAutoSubmitting: true }))
@@ -532,56 +523,9 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       console.log('Submitting quiz with answers:', currentAnswers)
       await submitQuizAttempt(attempt.id, currentAnswers)
       
-      // Enhanced faculty notification for auto-submitted quiz
-      if (user?.id && quiz.course_id) {
-        try {
-          const supabase = require("@/lib/supabase/client").createClient()
-          
-          // Get course and student information
-          const { data: courseData, error: courseError } = await supabase
-            .from("courses")
-            .select("instructor_id, title")
-            .eq("id", quiz.course_id)
-            .single()
-
-          const { data: studentData } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", user.id)
-            .single()
-
-          if (!courseError && courseData?.instructor_id) {
-            const studentName = studentData?.full_name || "Student"
-            const courseTitle = courseData.title || "Course"
-            const completedAt = new Date().toISOString()
-            
-            // Notify faculty about auto-submitted quiz completion
-            await notifyFacultyQuizCompleted(
-              courseData.instructor_id,
-              studentName,
-              quiz.title,
-              courseTitle,
-              completedAt
-            )
-            
-            // Track student activity for comprehensive monitoring
-            await trackStudentActivity(
-              user.id,
-              quiz.course_id,
-              'quiz_completed',
-              {
-                quizTitle: quiz.title,
-                completedAt: completedAt,
-                isAutoSubmitted: true
-              }
-            )
-            
-            console.log("Enhanced faculty notification sent for auto-submitted quiz:", quiz.title)
-          }
-        } catch (notificationError) {
-          console.log("Enhanced notification failed, but quiz was auto-submitted:", notificationError)
-        }
-      }
+      // Note: Notifications are now handled automatically by database triggers
+      // No need for client-side notification creation to avoid RLS errors
+      console.log("Quiz submitted successfully - notifications will be created by database triggers")
       
       // Update state
       setQuizState((prev) => ({ ...prev, isSubmitted: true, isAutoSubmitting: false }))
@@ -663,7 +607,11 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
-        <p>Loading quiz...</p>
+        <div className="flex flex-col items-center justify-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="text-lg font-medium text-gray-900">Loading Quiz Questions...</div>
+          <div className="text-sm text-gray-600">Please wait while we prepare your quiz</div>
+        </div>
       </div>
     )
   }
@@ -736,11 +684,12 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const progress = ((quizState.currentQuestion + 1) / quizState.questions.length) * 100
 
   // Debug logging
-  console.log('Quiz Taking Debug:', {
+  console.log('🔍 QUIZ TAKING DEBUG:', {
     questionsLength: quizState.questions?.length,
     currentQuestionIndex: quizState.currentQuestion,
     currentQuestion: currentQuestion,
-    questions: quizState.questions
+    questions: quizState.questions,
+    allQuestionIds: quizState.questions?.map(q => q.id) || []
   })
 
   if (!currentQuestion || quizState.currentQuestion >= quizState.questions.length) {

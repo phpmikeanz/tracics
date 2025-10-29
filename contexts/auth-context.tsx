@@ -119,21 +119,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Helper function to create profile from auth data (async, non-blocking)
+  const createProfileFromAuth = async (authUser: SupabaseUser) => {
+    try {
+      const userMetadata = authUser.user_metadata || {}
+      const role = userMetadata.role || "student"
+      const fullName = userMetadata.full_name || authUser.email?.split("@")[0] || "User"
+      
+      const { error } = await supabase.from("profiles").upsert({
+        id: authUser.id,
+        email: authUser.email || "",
+        full_name: fullName,
+        role: role,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      
+      if (error) {
+        console.warn("[Auth] Failed to create/update profile:", error)
+      } else {
+        console.log("[Auth] Profile created/updated successfully")
+      }
+    } catch (error) {
+      console.warn("[Auth] Exception creating profile:", error)
+    }
+  }
+
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log("[Auth] Fetching profile for user:", authUser.id)
       
-      // Add timeout to prevent hanging
+      // Try direct profile fetch first with shorter timeout
       const profilePromise = supabase.from("profiles").select("*").eq("id", authUser.id).single()
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 10000)
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000) // Reduced to 5 seconds
       )
       
       const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any
 
       if (error) {
         console.error("[Auth] Error fetching user profile:", error)
-        console.log("[Auth] Profile not found, using auth metadata")
+        console.error("[Auth] Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        
+        // Check if it's a timeout or RLS issue
+        if (error.message.includes("timeout")) {
+          console.warn("[Auth] Profile fetch timed out, using auth metadata")
+        } else if (error.code === '42501' || error.message.includes('policy')) {
+          console.warn("[Auth] RLS policy blocking profile access, using auth metadata")
+        } else {
+          console.warn("[Auth] Profile not found, using auth metadata")
+        }
         
         // Try to create profile from auth metadata if it doesn't exist
         const userMetadata = authUser.user_metadata || {}
@@ -149,6 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar: undefined,
         })
         setLoading(false) // Stop loading immediately after setting user
+        
+        // Try to create the profile in the database asynchronously (don't wait)
+        createProfileFromAuth(authUser).catch(err => 
+          console.warn("[Auth] Failed to create profile in database:", err)
+        )
         return
       }
 
@@ -277,6 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: name,
             role: role,
           },
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
         },
       })
 

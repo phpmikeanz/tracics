@@ -332,11 +332,12 @@ export function AssignmentManagement() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-gray-900">Assignment Management</h2>
-            {actualUnreadCount > 0 && (
+            {/* Notification badge hidden as requested */}
+            {/* {actualUnreadCount > 0 && (
               <Badge variant="destructive" className="animate-pulse">
                 {actualUnreadCount} new notification{actualUnreadCount > 1 ? 's' : ''}
               </Badge>
-            )}
+            )} */}
           </div>
           <p className="text-gray-600">Create and manage course assignments with real-time notifications</p>
         </div>

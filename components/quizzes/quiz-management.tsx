@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calendar } from "@/components/ui/calendar"
@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { HelpCircle, Plus, Edit, CalendarIcon, Clock, Users, BarChart3, Trash2, Loader2, FileText } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import Swal from 'sweetalert2'
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { 
@@ -52,7 +53,19 @@ type Quiz = Database["public"]["Tables"]["quizzes"]["Row"] & {
 
 type QuizQuestion = Database["public"]["Tables"]["quiz_questions"]["Row"]
 type QuizAttempt = Database["public"]["Tables"]["quiz_attempts"]["Row"] & {
-  profiles?: { full_name: string } | null
+  profiles?: {
+    id?: string
+    email?: string
+    full_name?: string | null
+    role?: "student" | "faculty"
+    avatar_url?: string | null
+    created_at?: string
+    updated_at?: string
+  } | null
+  quizzes?: {
+    title?: string
+    time_limit?: number | null
+  } | null
 }
 
 type Course = Database["public"]["Tables"]["courses"]["Row"]
@@ -68,6 +81,61 @@ interface CreateQuestionForm {
 export function QuizManagement() {
   const { user } = useAuth()
   const { toast } = useToast()
+  
+  // Configure SweetAlert2 global settings for proper z-index and accessibility
+  useEffect(() => {
+    // Add CSS for high z-index SweetAlert2 modals and accessibility
+    const style = document.createElement('style')
+    style.textContent = `
+      .swal2-container {
+        z-index: 9999 !important;
+        pointer-events: auto !important;
+      }
+      .swal2-backdrop {
+        z-index: 9998 !important;
+        pointer-events: auto !important;
+      }
+      .swal2-popup {
+        pointer-events: auto !important;
+      }
+      .swal2-actions {
+        pointer-events: auto !important;
+      }
+      .swal2-confirm, .swal2-cancel {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+      }
+      /* Custom clickable classes */
+      .swal2-container-clickable {
+        pointer-events: auto !important;
+      }
+      .swal2-popup-clickable {
+        pointer-events: auto !important;
+      }
+      .swal2-actions-clickable {
+        pointer-events: auto !important;
+      }
+      .swal2-confirm-clickable, .swal2-cancel-clickable {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+        user-select: none !important;
+      }
+      /* Ensure proper focus management */
+      .swal2-container:not(.swal2-no-backdrop) {
+        position: fixed !important;
+      }
+      /* Prevent aria-hidden conflicts */
+      .swal2-container[aria-hidden="true"] {
+        display: none !important;
+      }
+    `
+    document.head.appendChild(style)
+    
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [])
+
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,29 +143,14 @@ export function QuizManagement() {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null)
   const [selectedQuizQuestions, setSelectedQuizQuestions] = useState<QuizQuestion[]>([])
   const [selectedQuizAttempts, setSelectedQuizAttempts] = useState<QuizAttempt[]>([])
+
+  // Note: Quiz completion notifications are now handled by database triggers
+  // and will appear in the notification bell automatically
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const datePickerRef = useRef<HTMLDivElement>(null)
-  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
-    isOpen: boolean
-    quizId: string | null
-    quizTitle: string
-  }>({
-    isOpen: false,
-    quizId: null,
-    quizTitle: ''
-  })
-  const [deleteQuestionDialog, setDeleteQuestionDialog] = useState<{
-    isOpen: boolean
-    questionId: string | null
-    questionText: string
-  }>({
-    isOpen: false,
-    questionId: null,
-    questionText: ''
-  })
   const [editQuestionDialog, setEditQuestionDialog] = useState<{
     isOpen: boolean
     question: QuizQuestion | null
@@ -138,6 +191,17 @@ export function QuizManagement() {
     correct_answer: "",
     points: 1,
   })
+  const [questionErrors, setQuestionErrors] = useState<{
+    question?: string
+    options?: string
+    correct_answer?: string
+    points?: string
+  }>({})
+  const [isDeletingQuestion, setIsDeletingQuestion] = useState<string | null>(null)
+  const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false)
+  const [isLoadingQuizDetails, setIsLoadingQuizDetails] = useState(false)
+  const [isRefreshingQuizzes, setIsRefreshingQuizzes] = useState(false)
+  const deleteButtonRef = useRef<HTMLButtonElement>(null)
 
   // Load data when component mounts or user changes
   useEffect(() => {
@@ -173,6 +237,11 @@ export function QuizManagement() {
     try {
       setLoading(true)
       const data = await getQuizzesByInstructor(user.id)
+      console.log('Loaded quizzes:', data.map(q => ({ 
+        id: q.id, 
+        title: q.title, 
+        questionsCount: q.quiz_questions?.length || 0 
+      })))
       setQuizzes(data)
     } catch (error) {
       console.error('Error loading quizzes:', error)
@@ -203,11 +272,21 @@ export function QuizManagement() {
   }
 
   const loadQuizDetails = async (quiz: Quiz) => {
+    setIsLoadingQuizDetails(true)
     try {
       const [questions, attempts] = await Promise.all([
         getQuizQuestions(quiz.id),
         getQuizAttempts(quiz.id)
       ])
+      
+      // Debug: Log profile data to see what fields are available
+      console.log('Quiz attempts with profiles:', attempts.map(attempt => ({
+        id: attempt.id,
+        student_name: attempt.profiles?.full_name,
+        profile_fields: attempt.profiles ? Object.keys(attempt.profiles) : [],
+        profile_data: attempt.profiles
+      })))
+      
       setSelectedQuizQuestions(questions)
       setSelectedQuizAttempts(attempts)
       
@@ -226,6 +305,8 @@ export function QuizManagement() {
         description: "Failed to load quiz details. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsLoadingQuizDetails(false)
     }
   }
 
@@ -297,7 +378,60 @@ export function QuizManagement() {
     }
   }
 
+  const validateQuestion = (questionData: CreateQuestionForm): boolean => {
+    const errors: typeof questionErrors = {}
+    let isValid = true
+
+    // Validate question text
+    if (!questionData.question || questionData.question.trim() === '') {
+      errors.question = 'Question is required'
+      isValid = false
+    }
+
+    // Validate options for multiple choice
+    if (questionData.type === 'multiple_choice') {
+      const validOptions = questionData.options?.filter(opt => opt.trim() !== '') || []
+      if (validOptions.length < 2) {
+        errors.options = 'At least 2 options are required for multiple choice questions'
+        isValid = false
+      }
+      
+      // Check if correct answer is selected
+      if (!questionData.correct_answer || questionData.correct_answer.trim() === '') {
+        errors.correct_answer = 'Please select the correct answer'
+        isValid = false
+      }
+    }
+
+    // Validate correct answer for true/false
+    if (questionData.type === 'true_false') {
+      if (!questionData.correct_answer || (questionData.correct_answer !== 'true' && questionData.correct_answer !== 'false')) {
+        errors.correct_answer = 'Please select True or False'
+        isValid = false
+      }
+    }
+
+    // Validate points
+    if (!questionData.points || questionData.points <= 0) {
+      errors.points = 'Points must be greater than 0'
+      isValid = false
+    }
+
+    setQuestionErrors(errors)
+    return isValid
+  }
+
   const handleAddQuestion = async (quizId: string, questionData: CreateQuestionForm) => {
+    // Validate the form first
+    if (!validateQuestion(questionData)) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors before adding the question.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       // For essay and short answer questions, correct_answer should be null
       // For multiple choice and true/false, it should be the selected answer
@@ -307,7 +441,7 @@ export function QuizManagement() {
 
       const questionToAdd = {
         quiz_id: quizId,
-        question: questionData.question,
+        question: questionData.question.trim(),
         type: questionData.type,
         options: questionData.options && questionData.options.filter(opt => opt.trim() !== '') || null,
         correct_answer: correctAnswer,
@@ -329,7 +463,7 @@ export function QuizManagement() {
         description: "Question added successfully!",
       })
 
-      // Reset form
+      // Reset form and errors
       setCurrentQuestion({
         type: "multiple_choice",
         question: "",
@@ -337,6 +471,18 @@ export function QuizManagement() {
         correct_answer: "",
         points: 1,
       })
+      setQuestionErrors({})
+      
+      // Close the add question dialog
+      setIsAddQuestionDialogOpen(false)
+      
+      // Refresh the quiz list to show updated question count
+      // Add a small delay to ensure database has been updated
+      setTimeout(async () => {
+        setIsRefreshingQuizzes(true)
+        await loadQuizzes()
+        setIsRefreshingQuizzes(false)
+      }, 500)
     } catch (error) {
       console.error('Error adding question:', error)
       toast({
@@ -365,93 +511,190 @@ export function QuizManagement() {
     }
   }
 
-  const handleDeleteQuiz = (quizId: string, quizTitle: string) => {
-    setDeleteConfirmDialog({
-      isOpen: true,
-      quizId,
-      quizTitle
+  const handleDeleteQuiz = async (quizId: string, quizTitle: string) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `You are about to delete the quiz "${quizTitle}". This action cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
     })
-  }
 
-  const confirmDeleteQuiz = async () => {
-    if (!deleteConfirmDialog.quizId) return
-
-    try {
-      await deleteQuiz(deleteConfirmDialog.quizId)
-      await loadQuizzes() // Reload to get updated list
-      toast({
-        title: "Success",
-        description: "Quiz deleted successfully!",
-      })
-    } catch (error) {
-      console.error('Error deleting quiz:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete quiz. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setDeleteConfirmDialog({
-        isOpen: false,
-        quizId: null,
-        quizTitle: ''
-      })
-    }
-  }
-
-  const cancelDeleteQuiz = () => {
-    setDeleteConfirmDialog({
-      isOpen: false,
-      quizId: null,
-      quizTitle: ''
-    })
-  }
-
-  const handleDeleteQuestion = (questionId: string, questionText: string) => {
-    setDeleteQuestionDialog({
-      isOpen: true,
-      questionId,
-      questionText
-    })
-  }
-
-  const confirmDeleteQuestion = async () => {
-    if (!deleteQuestionDialog.questionId) return
-
-    try {
-      await deleteQuizQuestion(deleteQuestionDialog.questionId)
-      
-      toast({
-        title: "Success",
-        description: "Question deleted successfully!",
-      })
-      
-      // Reload quiz details to get updated questions
-      if (selectedQuiz) {
-        await loadQuizDetails(selectedQuiz)
+    if (result.isConfirmed) {
+      try {
+        await deleteQuiz(quizId)
+        await loadQuizzes() // Reload to get updated list
+        
+        Swal.fire({
+          title: 'Deleted!',
+          text: 'Quiz has been deleted successfully.',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        })
+      } catch (error) {
+        console.error('Error deleting quiz:', error)
+        Swal.fire({
+          title: 'Error!',
+          text: 'Failed to delete quiz. Please try again.',
+          icon: 'error',
+          confirmButtonText: 'OK'
+        })
       }
-    } catch (error) {
-      console.error('Error deleting question:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete question. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setDeleteQuestionDialog({
-        isOpen: false,
-        questionId: null,
-        questionText: ''
-      })
     }
   }
 
-  const cancelDeleteQuestion = () => {
-    setDeleteQuestionDialog({
-      isOpen: false,
-      questionId: null,
-      questionText: ''
+  const handleDeleteQuestion = async (questionId: string, questionText: string) => {
+    // Prevent multiple delete operations
+    if (isDeletingQuestion) {
+      return
+    }
+
+    // Close the Add Question dialog first if it's open
+    const wasAddQuestionDialogOpen = isAddQuestionDialogOpen
+    if (wasAddQuestionDialogOpen) {
+      setIsAddQuestionDialogOpen(false)
+      // Wait for dialog to close
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+
+    // Ensure SweetAlert is properly initialized
+    Swal.close()
+    
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `You are about to delete this question. This action cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        // Ensure buttons are clickable after modal opens
+        setTimeout(() => {
+          const confirmBtn = document.querySelector('.swal2-confirm') as HTMLButtonElement
+          const cancelBtn = document.querySelector('.swal2-cancel') as HTMLButtonElement
+          if (confirmBtn) {
+            confirmBtn.style.pointerEvents = 'auto'
+            confirmBtn.style.cursor = 'pointer'
+          }
+          if (cancelBtn) {
+            cancelBtn.style.pointerEvents = 'auto'
+            cancelBtn.style.cursor = 'pointer'
+          }
+        }, 100)
+      }
     })
+
+    if (result.isConfirmed) {
+      setIsDeletingQuestion(questionId)
+      
+      // Update the confirmation modal to show loading state
+      Swal.fire({
+        title: 'Deleting...',
+        text: 'Please wait while we delete the question.',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading()
+        }
+      })
+      
+      try {
+        // Add timeout to prevent hanging
+        const deletePromise = deleteQuizQuestion(questionId)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Delete operation timed out')), 10000)
+        )
+        
+        await Promise.race([deletePromise, timeoutPromise])
+        
+        // Optimize: Only reload questions, not the entire quiz details
+        if (selectedQuiz) {
+          const updatedQuestions = await getQuizQuestions(selectedQuiz.id)
+          setSelectedQuizQuestions(updatedQuestions)
+        }
+        
+        // Show success message
+        try {
+          await Swal.fire({
+            title: 'Deleted!',
+            text: 'Question has been deleted successfully.',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+          })
+        } catch (swalError) {
+          // Fallback to toast if SweetAlert fails
+          console.error('SweetAlert error:', swalError)
+          toast({
+            title: "Success",
+            description: "Question has been deleted successfully!",
+          })
+        }
+        
+        // Refresh the quiz list to show updated question count
+        // Add a small delay to ensure database has been updated
+        setTimeout(async () => {
+          await loadQuizzes()
+        }, 500)
+        
+        // Reopen the Add Question dialog if it was open before deletion
+        if (wasAddQuestionDialogOpen) {
+          setTimeout(() => {
+            setIsAddQuestionDialogOpen(true)
+          }, 1600) // Wait for success modal to close
+        }
+        
+      } catch (error) {
+        console.error('Error deleting question:', error)
+        const errorMessage = error instanceof Error && error.message.includes('timed out') 
+          ? 'Delete operation timed out. Please try again.'
+          : 'Failed to delete question. Please try again.'
+          
+        try {
+          await Swal.fire({
+            title: 'Error!',
+            text: errorMessage,
+            icon: 'error',
+            confirmButtonText: 'OK'
+          })
+        } catch (swalError) {
+          // Fallback to toast if SweetAlert fails
+          console.error('SweetAlert error:', swalError)
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          })
+        }
+        
+        // Reopen the Add Question dialog if it was open before deletion (even on error)
+        if (wasAddQuestionDialogOpen) {
+          setTimeout(() => {
+            setIsAddQuestionDialogOpen(true)
+          }, 1000) // Wait a bit for error modal to show
+        }
+      } finally {
+        setIsDeletingQuestion(null)
+      }
+    } else {
+      // If user cancelled, reopen the Add Question dialog if it was open before
+      if (wasAddQuestionDialogOpen) {
+        setTimeout(() => {
+          setIsAddQuestionDialogOpen(true)
+        }, 100)
+      }
+    }
   }
 
   const handleEditQuestion = (question: QuizQuestion) => {
@@ -486,6 +729,12 @@ export function QuizManagement() {
       if (selectedQuiz) {
         await loadQuizDetails(selectedQuiz)
       }
+      
+      // Refresh the quiz list to show updated question count
+      // Add a small delay to ensure database has been updated
+      setTimeout(async () => {
+        await loadQuizzes()
+      }, 500)
       
       toast({
         title: "Success",
@@ -924,6 +1173,7 @@ export function QuizManagement() {
     }
   }
 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -1089,6 +1339,13 @@ export function QuizManagement() {
       </div>
 
       {/* Quiz Grid */}
+      {isRefreshingQuizzes && (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          <span className="text-sm text-gray-600">Updating quiz information...</span>
+        </div>
+      )}
+      
       {quizzes.length === 0 ? (
         <div className="text-center py-8">
           <HelpCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1161,9 +1418,14 @@ export function QuizManagement() {
                     size="sm"
                       className="flex-1 bg-transparent"
                       onClick={() => handleEditQuiz(quiz)}
+                      disabled={isLoadingQuizDetails}
                   >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Manage {/* Updated to Manage */}
+                      {isLoadingQuizDetails ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Edit className="h-4 w-4 mr-1" />
+                      )}
+                      {isLoadingQuizDetails ? 'Loading...' : 'Manage'}
                   </Button>
                     <Button
                       variant={quiz.status === 'published' ? 'default' : 'outline'}
@@ -1223,10 +1485,42 @@ export function QuizManagement() {
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="questions" className="space-y-4">
+            {isLoadingQuizDetails ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-gray-900">Loading Quiz Details</h3>
+                  <p className="text-sm text-gray-500">Please wait while we load the quiz information...</p>
+                </div>
+                <div className="w-full max-w-md space-y-2">
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Loading questions...</span>
+                    <span>Loading attempts...</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <TabsContent value="questions" className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Quiz Questions</h3>
-                <Dialog>
+                <Dialog 
+                  open={isAddQuestionDialogOpen} 
+                  onOpenChange={(open) => {
+                    setIsAddQuestionDialogOpen(open)
+                    // Ensure proper focus management when dialog closes
+                    if (!open) {
+                      setTimeout(() => {
+                        if (document.activeElement && document.activeElement instanceof HTMLElement) {
+                          document.activeElement.blur()
+                        }
+                      }, 100)
+                    }
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="h-4 w-4 mr-2" />
@@ -1251,6 +1545,8 @@ export function QuizManagement() {
                               options: value === "multiple_choice" ? ["", "", "", ""] : undefined
                             }
                             setCurrentQuestion(resetFields)
+                            // Clear all errors when changing question type
+                            setQuestionErrors({})
                           }}
                         >
                           <SelectTrigger>
@@ -1270,60 +1566,127 @@ export function QuizManagement() {
                         <Textarea
                           id="question-text"
                           value={currentQuestion.question}
-                          onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })}
+                          onChange={(e) => {
+                            setCurrentQuestion({ ...currentQuestion, question: e.target.value })
+                            // Clear error when user starts typing
+                            if (questionErrors.question) {
+                              setQuestionErrors({ ...questionErrors, question: undefined })
+                            }
+                          }}
                           placeholder="Enter your question here..."
                           rows={3}
+                          className={questionErrors.question ? "border-red-500 focus:border-red-500" : ""}
                         />
+                        {questionErrors.question && (
+                          <p className="text-sm text-red-500">{questionErrors.question}</p>
+                        )}
                       </div>
 
                       {currentQuestion.type === "multiple_choice" && (
-                        <div className="space-y-3">
-                          <Label>Answer Options</Label>
-                          {currentQuestion.options?.map((option, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Input
-                                value={option}
-                                onChange={(e) => {
-                                  const newOptions = [...(currentQuestion.options || [])]
-                                  newOptions[index] = e.target.value
-                                  setCurrentQuestion({ ...currentQuestion, options: newOptions })
-                                }}
-                                placeholder={`Option ${index + 1}`}
-                              />
-                              <RadioGroup
-                            value={currentQuestion.correct_answer}
-                                onValueChange={(value) =>
-                              setCurrentQuestion({ ...currentQuestion, correct_answer: value })
-                                }
+                        <div className="space-y-4">
+                          <Label className="text-base font-medium">Answer Options</Label>
+                          <div className="space-y-3">
+                            {currentQuestion.options?.map((option, index) => (
+                              <div 
+                                key={index} 
+                                className={`flex items-center gap-3 p-4 border rounded-lg transition-all ${
+                                  currentQuestion.correct_answer === option 
+                                    ? 'bg-green-50 border-green-200 shadow-sm' 
+                                    : 'bg-gray-50 hover:bg-gray-100'
+                                }`}
                               >
-                                <div className="flex items-center space-x-2">
-                                  <RadioGroupItem value={option} id={`option-${index}`} />
-                                  <Label htmlFor={`option-${index}`} className="text-sm">
-                                    Correct
-                                  </Label>
+                                <div className="flex-1">
+                                  <Input
+                                    value={option}
+                                    onChange={(e) => {
+                                      const newOptions = [...(currentQuestion.options || [])]
+                                      newOptions[index] = e.target.value
+                                      setCurrentQuestion({ ...currentQuestion, options: newOptions })
+                                      // Clear options error when user starts typing
+                                      if (questionErrors.options) {
+                                        setQuestionErrors({ ...questionErrors, options: undefined })
+                                      }
+                                    }}
+                                    placeholder={`Option ${index + 1}`}
+                                    className="w-full"
+                                  />
                                 </div>
-                              </RadioGroup>
-                            </div>
-                          ))}
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroup
+                                    value={currentQuestion.correct_answer}
+                                    onValueChange={(value) => {
+                                      setCurrentQuestion({ ...currentQuestion, correct_answer: value })
+                                      // Clear correct answer error when user selects
+                                      if (questionErrors.correct_answer) {
+                                        setQuestionErrors({ ...questionErrors, correct_answer: undefined })
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value={option} id={`option-${index}`} />
+                                      <Label htmlFor={`option-${index}`} className="text-sm font-medium cursor-pointer">
+                                        Correct
+                                      </Label>
+                                    </div>
+                                  </RadioGroup>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {questionErrors.options && (
+                            <p className="text-sm text-red-500">{questionErrors.options}</p>
+                          )}
+                          {questionErrors.correct_answer && (
+                            <p className="text-sm text-red-500">{questionErrors.correct_answer}</p>
+                          )}
+                          <p className="text-sm text-gray-600">
+                            Select the correct answer by clicking the radio button next to the option.
+                          </p>
                         </div>
                       )}
 
                       {currentQuestion.type === "true_false" && (
-                        <div className="space-y-2">
-                          <Label>Correct Answer</Label>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Correct Answer</Label>
                           <RadioGroup
                             value={currentQuestion.correct_answer}
-                            onValueChange={(value) => setCurrentQuestion({ ...currentQuestion, correct_answer: value })}
+                            onValueChange={(value) => {
+                              setCurrentQuestion({ ...currentQuestion, correct_answer: value })
+                              // Clear correct answer error when user selects
+                              if (questionErrors.correct_answer) {
+                                setQuestionErrors({ ...questionErrors, correct_answer: undefined })
+                              }
+                            }}
                           >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="true" id="true" />
-                              <Label htmlFor="true">True</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="false" id="false" />
-                              <Label htmlFor="false">False</Label>
+                            <div className="space-y-3">
+                              <div className={`flex items-center space-x-3 p-4 border rounded-lg transition-colors ${
+                                currentQuestion.correct_answer === 'true' 
+                                  ? 'bg-green-100 border-green-300 shadow-sm' 
+                                  : 'bg-green-50 hover:bg-green-100'
+                              }`}>
+                                <RadioGroupItem value="true" id="true" />
+                                <Label htmlFor="true" className="flex-1 cursor-pointer text-base font-medium">
+                                  True
+                                </Label>
+                              </div>
+                              <div className={`flex items-center space-x-3 p-4 border rounded-lg transition-colors ${
+                                currentQuestion.correct_answer === 'false' 
+                                  ? 'bg-red-100 border-red-300 shadow-sm' 
+                                  : 'bg-red-50 hover:bg-red-100'
+                              }`}>
+                                <RadioGroupItem value="false" id="false" />
+                                <Label htmlFor="false" className="flex-1 cursor-pointer text-base font-medium">
+                                  False
+                                </Label>
+                              </div>
                             </div>
                           </RadioGroup>
+                          {questionErrors.correct_answer && (
+                            <p className="text-sm text-red-500">{questionErrors.correct_answer}</p>
+                          )}
+                          <p className="text-sm text-gray-600">
+                            Select whether the statement is true or false.
+                          </p>
                         </div>
                       )}
 
@@ -1347,17 +1710,25 @@ export function QuizManagement() {
                             id="points"
                             type="number"
                             value={currentQuestion.points}
-                            onChange={(e) =>
-                              setCurrentQuestion({ ...currentQuestion, points: Number.parseInt(e.target.value) })
-                            }
+                            onChange={(e) => {
+                              setCurrentQuestion({ ...currentQuestion, points: Number.parseInt(e.target.value) || 1 })
+                              // Clear points error when user changes value
+                              if (questionErrors.points) {
+                                setQuestionErrors({ ...questionErrors, points: undefined })
+                              }
+                            }}
                             min="1"
+                            className={questionErrors.points ? "border-red-500 focus:border-red-500" : ""}
                           />
+                          {questionErrors.points && (
+                            <p className="text-sm text-red-500">{questionErrors.points}</p>
+                          )}
                         </div>
                       </div>
 
 
                       <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline">
+                        <Button type="button" variant="outline" onClick={() => setIsAddQuestionDialogOpen(false)}>
                           Cancel
                         </Button>
                         <Button
@@ -1375,8 +1746,34 @@ export function QuizManagement() {
                 </Dialog>
               </div>
 
-              <div className="space-y-3">
-                {selectedQuizQuestions.map((question, index) => (
+              <div className="relative max-h-96 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                {isLoadingQuizDetails ? (
+                  // Skeleton loading for questions
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <Card key={index} className="animate-pulse">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                            <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                            <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : selectedQuizQuestions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Questions Yet</h3>
+                    <p className="text-gray-500">This quiz doesn't have any questions. Add some questions to get started.</p>
+                  </div>
+                ) : (
+                  selectedQuizQuestions.map((question, index) => (
                   <Card key={question.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
@@ -1421,26 +1818,38 @@ export function QuizManagement() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
+                            ref={deleteButtonRef}
                             variant="outline" 
                             size="sm"
                             onClick={() => handleDeleteQuestion(question.id, question.question)}
-                            className="text-red-600 hover:text-red-700"
+                            disabled={isDeletingQuestion === question.id}
+                            className="text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label={`Delete question: ${question.question.substring(0, 50)}${question.question.length > 50 ? '...' : ''}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {isDeletingQuestion === question.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-
-                {selectedQuizQuestions.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <HelpCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No questions added yet. Click "Add Question" to get started.</p>
-                  </div>
+                ))
+                )}
+                
+                {/* Fade effect at bottom when there are many questions */}
+                {selectedQuizQuestions.length > 5 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
                 )}
               </div>
+              
+              {selectedQuizQuestions.length > 5 && (
+                <div className="text-center py-2 text-sm text-gray-500 bg-gray-50 rounded-md">
+                  <p>Scroll to view all {selectedQuizQuestions.length} questions</p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
@@ -1620,6 +2029,7 @@ export function QuizManagement() {
                 </div>
               </div>
 
+
               <div className="space-y-3">
                 {selectedQuizAttempts.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
@@ -1628,14 +2038,36 @@ export function QuizManagement() {
                   </div>
                 ) : (
                   selectedQuizAttempts.map((attempt) => (
-                    <Card key={attempt.id}>
+                    <Card key={attempt.id} data-attempt-status={attempt.status}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                              <AvatarFallback>
-                                {attempt.profiles?.full_name?.charAt(0) || 'S'}
-                              </AvatarFallback>
+                          <Avatar className="h-10 w-10 ring-2 ring-gray-200">
+                            <AvatarImage 
+                              src={
+                                attempt.profiles?.avatar_url || 
+                                (attempt.profiles?.full_name 
+                                  ? `https://ui-avatars.com/api/?name=${encodeURIComponent(attempt.profiles.full_name)}&background=3b82f6&color=ffffff&size=40`
+                                  : '')
+                              } 
+                              alt={attempt.profiles?.full_name || 'Student'}
+                              className="object-cover"
+                              onError={(e) => {
+                                // Hide the image if it fails to load, showing fallback instead
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold text-sm">
+                              {attempt.profiles?.full_name 
+                                ? attempt.profiles.full_name
+                                    .split(' ')
+                                    .map(n => n[0])
+                                    .join('')
+                                    .toUpperCase()
+                                    .slice(0, 2)
+                                : 'S'
+                              }
+                            </AvatarFallback>
                           </Avatar>
                           <div>
                               <p className="font-medium">{attempt.profiles?.full_name || 'Unknown Student'}</p>
@@ -1841,7 +2273,7 @@ export function QuizManagement() {
                   <CardTitle>Question Performance</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="max-h-96 overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                     {selectedQuizQuestions.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -1869,84 +2301,13 @@ export function QuizManagement() {
                 </CardContent>
               </Card>
             </TabsContent>
+              </>
+            )}
           </Tabs>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmDialog.isOpen} onOpenChange={(open) => {
-        if (!open) {
-          cancelDeleteQuiz()
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirm Delete</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Are you sure you want to delete the quiz <strong>"{deleteConfirmDialog.quizTitle}"</strong>?
-            </p>
-            <p className="text-xs text-red-600">
-              This action cannot be undone. All quiz data, questions, and student attempts will be permanently deleted.
-            </p>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={cancelDeleteQuiz}>
-              No, Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmDeleteQuiz}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Yes, Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Question Confirmation Dialog */}
-      <Dialog open={deleteQuestionDialog.isOpen} onOpenChange={(open) => {
-        if (!open) {
-          cancelDeleteQuestion()
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirm Delete Question</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Are you sure you want to delete this question?
-            </p>
-            <div className="p-3 bg-gray-50 rounded-md">
-              <p className="text-sm font-medium">
-                {deleteQuestionDialog.questionText.length > 100 
-                  ? deleteQuestionDialog.questionText.substring(0, 100) + '...'
-                  : deleteQuestionDialog.questionText
-                }
-              </p>
-            </div>
-            <p className="text-xs text-red-600">
-              This action cannot be undone. The question and all associated data will be permanently deleted.
-            </p>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={cancelDeleteQuestion}>
-              No, Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmDeleteQuestion}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Yes, Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Question Dialog */}
       <Dialog open={editQuestionDialog.isOpen} onOpenChange={(open) => {

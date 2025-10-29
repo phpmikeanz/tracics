@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { CheckCircle, Clock, FileText, MessageSquare, Star, Loader2 } from "lucide-react"
+import { CheckCircle, Clock, FileText, MessageSquare, Star, Loader2, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { 
@@ -17,7 +17,8 @@ import {
   gradeQuestion, 
   calculateTotalScore, 
   updateQuizAttemptScore,
-  getScoreBreakdown
+  getScoreBreakdown,
+  debugManualGradingIssue
 } from "@/lib/quizzes"
 import type { Database } from "@/lib/types"
 
@@ -53,6 +54,49 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
       loadGradingData()
     }
   }, [isOpen, attempt])
+
+  // Custom close handler that checks for ungraded questions
+  const handleClose = () => {
+    const manualQuestions = questions.filter(q => q.type === 'short_answer' || q.type === 'essay')
+    const gradedManualQuestions = manualQuestions.filter(q => 
+      grades.some(g => g.question_id === q.id)
+    )
+    const ungradedQuestions = manualQuestions.length - gradedManualQuestions.length
+
+    if (ungradedQuestions > 0) {
+      // Show a more prominent warning with detailed information
+      const confirmed = confirm(
+        `⚠️ INCOMPLETE MANUAL GRADING WARNING ⚠️\n\n` +
+        `You have ${ungradedQuestions} ungraded question(s) remaining out of ${manualQuestions.length} total manual questions.\n\n` +
+        `IMPORTANT:\n` +
+        `• Students will NOT see their quiz results until ALL questions are graded\n` +
+        `• The grading process cannot be undone once started\n` +
+        `• You should complete grading all questions before closing\n\n` +
+        `Are you sure you want to close the grading modal now?\n\n` +
+        `Click OK to force close (not recommended)\n` +
+        `Click Cancel to continue grading`
+      )
+      
+      if (!confirmed) {
+        // User chose to continue grading
+        toast({
+          title: "✅ Continue Grading",
+          description: `Please complete grading all ${manualQuestions.length} manual questions. ${ungradedQuestions} remaining.`,
+        })
+        return // Don't close the modal
+      } else {
+        // User confirmed they want to force close
+        toast({
+          title: "⚠️ Grading Incomplete",
+          description: `Modal closed with ${ungradedQuestions} ungraded questions. Students will not see results until all questions are graded.`,
+          variant: "destructive",
+        })
+      }
+    }
+
+    // All questions are graded, safe to close
+    onClose()
+  }
 
   // Validation function
   const validatePoints = (questionId: string, points: number | undefined, maxPoints: number) => {
@@ -185,8 +229,41 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
         return
       }
       
-      const result = await gradeQuestion(attempt.id, questionId, points, questionFeedback)
-      console.log('✅ Grade question result:', result)
+      // Check if this is the first manual grade being saved
+      const isFirstGrade = grades.length === 0
+      
+      if (isFirstGrade) {
+        const confirmed = confirm(
+          `🎯 STARTING MANUAL GRADING\n\n` +
+          `You are about to start grading manual questions for this quiz.\n\n` +
+          `IMPORTANT REMINDERS:\n` +
+          `• You must grade ALL manual questions before closing this modal\n` +
+          `• Students will NOT see results until ALL questions are graded\n` +
+          `• The grading process cannot be undone once started\n` +
+          `• Do not close this modal until you complete all grading\n\n` +
+          `Are you ready to start manual grading?\n\n` +
+          `Click OK to begin grading\n` +
+          `Click Cancel to review the questions first`
+        )
+        
+        if (!confirmed) {
+          setGrading(false)
+          return
+        }
+      }
+
+      try {
+        const result = await gradeQuestion(attempt.id, questionId, points, questionFeedback)
+        console.log('✅ Grade question result:', result)
+      } catch (error) {
+        console.error('❌ Error grading question:', error)
+        toast({
+          title: "Grading Failed",
+          description: `Failed to grade question: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: "destructive",
+        })
+        return
+      }
       
       // Reload grades to update the UI
       const updatedGrades = await getQuestionGrades(attempt.id)
@@ -197,6 +274,21 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
       const updatedBreakdown = await getScoreBreakdown(attempt.id)
       console.log('📈 Updated score breakdown:', updatedBreakdown)
       setScoreBreakdown(updatedBreakdown)
+      
+      // Refresh the attempt data to show updated score
+      const { data: updatedAttempt } = await supabase
+        .from('quiz_attempts')
+        .select('score, status')
+        .eq('id', attempt.id)
+        .single()
+      
+      if (updatedAttempt) {
+        console.log('🔄 Updated attempt score:', updatedAttempt.score)
+        console.log('📊 New score:', updatedAttempt.score, 'Status:', updatedAttempt.status)
+        
+        // Notify parent component that grading is complete so it can refresh
+        onGradingComplete()
+      }
       
       // Check if all essay/short answer questions have been graded
       const allQuestionsGraded = questions.every(q => 
@@ -233,9 +325,19 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
       console.error('❌ Error grading question:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       
+      // Handle specific error types
+      let userFriendlyMessage = errorMessage
+      if (errorMessage.includes('statement timeout') || errorMessage.includes('canceling statement')) {
+        userFriendlyMessage = 'Database timeout - this might be a performance issue. Please try again or contact support.'
+      } else if (errorMessage.includes('policy') || errorMessage.includes('permission')) {
+        userFriendlyMessage = 'Permission denied - RLS policy issue. Please contact support.'
+      } else if (errorMessage.includes('timeout')) {
+        userFriendlyMessage = 'Request timed out - please try again.'
+      }
+      
       toast({
         title: "Grading Failed",
-        description: `Failed to grade question: ${errorMessage}`,
+        description: userFriendlyMessage,
         variant: "destructive",
       })
     } finally {
@@ -287,6 +389,61 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
       toast({
         title: "Error",
         description: "Failed to finalize grading. Please try again or contact support.",
+        variant: "destructive",
+      })
+    } finally {
+      setGrading(false)
+    }
+  }
+
+  const handleDebugManualGrading = async () => {
+    try {
+      setGrading(true)
+      
+      if (!currentQuestion) {
+        toast({
+          title: "No Question Selected",
+          description: "Please select a question to debug.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      console.log('🔍 Starting manual grading debug...')
+      
+      const debugResult = await debugManualGradingIssue(attempt.id, currentQuestion.id)
+      
+      console.log('Debug result:', debugResult)
+      
+      if (debugResult.success) {
+        toast({
+          title: "✅ Debug Successful",
+          description: "Manual grading is working correctly. Check console for details.",
+        })
+      } else {
+        const errorMessage = debugResult.isRLSError 
+          ? `RLS Policy Error: ${debugResult.errorMessage || debugResult.error}`
+          : `Error at step ${debugResult.step}: ${debugResult.error}`
+        
+        toast({
+          title: "❌ Debug Failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        
+        if (debugResult.isRLSError) {
+          toast({
+            title: "🔧 RLS Policy Fix Needed",
+            description: "Please run the RLS policy fix script in your database.",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error('❌ Debug error:', error)
+      toast({
+        title: "Debug Failed",
+        description: "An error occurred during debugging. Check console for details.",
         variant: "destructive",
       })
     } finally {
@@ -450,7 +607,7 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
 
   if (loading) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -464,7 +621,7 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
   const currentQuestion = questions[currentQuestionIndex]
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -474,6 +631,153 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Important Notice - Show at the start of grading */}
+          {(() => {
+            const manualQuestions = questions.filter(q => q.type === 'short_answer' || q.type === 'essay')
+            const gradedManualQuestions = manualQuestions.filter(q => 
+              grades.some(g => g.question_id === q.id)
+            )
+            const ungradedQuestions = manualQuestions.length - gradedManualQuestions.length
+            
+            // Show initial warning if no grading has started yet
+            if (gradedManualQuestions.length === 0 && manualQuestions.length > 0) {
+              return (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2 text-blue-700">
+                      <AlertTriangle className="h-5 w-5" />
+                      📝 Manual Grading Required - Read Before Starting
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="p-4 bg-blue-100 border border-blue-300 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-blue-800 mb-2">
+                              Important: Manual grading cannot be undone once started!
+                            </p>
+                            <ul className="text-sm text-blue-700 space-y-1">
+                              <li>• <strong>You must grade ALL {manualQuestions.length} manual questions</strong> before closing this modal</li>
+                              <li>• <strong>Students will not see results</strong> until ALL questions are graded</li>
+                              <li>• <strong>Do not close this modal</strong> until you complete the entire grading process</li>
+                              <li>• <strong>Grading is permanent</strong> - you cannot undo or restart once you begin</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-blue-600 font-medium">
+                        ✅ Ready to start? Click "Grade Question" below to begin manual grading.
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            }
+            
+            // Show warning if grading has started but not completed
+            if (gradedManualQuestions.length > 0 && ungradedQuestions > 0) {
+              return (
+                <Card className="border-red-200 bg-red-50">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2 text-red-700">
+                      <AlertTriangle className="h-5 w-5" />
+                      ⚠️ Manual Grading in Progress - Complete All Questions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-red-800 mb-2">
+                              Important: You have started manual grading and must complete ALL questions!
+                            </p>
+                            <ul className="text-sm text-red-700 space-y-1">
+                              <li>• <strong>You cannot undo</strong> the grading process once started</li>
+                              <li>• <strong>Students will see results</strong> only after ALL questions are graded</li>
+                              <li>• <strong>Do not close this modal</strong> until you finish grading all {manualQuestions.length} manual questions</li>
+                              <li>• <strong>Remaining questions:</strong> {ungradedQuestions} out of {manualQuestions.length}</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-red-600 font-medium">
+                        🚨 Closing this modal now will leave {ungradedQuestions} question(s) ungraded and students will not see their results!
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            }
+            return null
+          })()}
+
+          {/* Grading Progress Indicator */}
+          {(() => {
+            const manualQuestions = questions.filter(q => q.type === 'short_answer' || q.type === 'essay')
+            const gradedManualQuestions = manualQuestions.filter(q => 
+              grades.some(g => g.question_id === q.id)
+            )
+            const ungradedQuestions = manualQuestions.length - gradedManualQuestions.length
+            
+            return (
+              <Card className={ungradedQuestions > 0 ? "border-orange-200 bg-orange-50" : "border-green-200 bg-green-50"}>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {ungradedQuestions > 0 ? (
+                      <>
+                        <AlertTriangle className="h-5 w-5 text-orange-600" />
+                        Manual Grading Progress
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        All Questions Graded
+                      </>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Manual Questions Progress:</span>
+                      <span className="text-sm font-bold">
+                        {gradedManualQuestions.length}/{manualQuestions.length} completed
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          ungradedQuestions > 0 ? 'bg-orange-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${manualQuestions.length > 0 ? (gradedManualQuestions.length / manualQuestions.length) * 100 : 0}%` }}
+                      />
+                    </div>
+                    {ungradedQuestions > 0 && (
+                      <div className="flex items-center gap-2 text-orange-700">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-sm">
+                          {ungradedQuestions} question(s) still need grading before the quiz can be finalized.
+                        </span>
+                      </div>
+                    )}
+                    {ungradedQuestions === 0 && manualQuestions.length > 0 && (
+                      <div className="flex items-center gap-2 text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm">
+                          All manual questions have been graded. The quiz will be automatically finalized.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
+
           {/* Score Breakdown */}
           {scoreBreakdown && !scoreBreakdown.error && (
             <Card>
@@ -821,6 +1125,15 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
                     )}
                   </Button>
                   
+                  <Button
+                    onClick={handleDebugManualGrading}
+                    disabled={grading}
+                    variant="outline"
+                    className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                  >
+                    🔍 Debug
+                  </Button>
+                  
                   {getQuestionStatus(currentQuestion.id) === 'graded' && (
                     <Button variant="outline" disabled>
                       <CheckCircle className="h-4 w-4 mr-2" />
@@ -894,6 +1207,42 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
             </Card>
           )}
         </div>
+
+        {/* Dialog Footer with Force Close Option */}
+        {(() => {
+          const manualQuestions = questions.filter(q => q.type === 'short_answer' || q.type === 'essay')
+          const gradedManualQuestions = manualQuestions.filter(q => 
+            grades.some(g => g.question_id === q.id)
+          )
+          const ungradedQuestions = manualQuestions.length - gradedManualQuestions.length
+          
+          if (ungradedQuestions > 0) {
+            return (
+              <div className="flex items-center justify-between p-4 border-t bg-gray-50">
+                <div className="flex items-center gap-2 text-orange-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {ungradedQuestions} question(s) still need grading
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to close without grading ${ungradedQuestions} question(s)? The quiz will remain in "completed" status until all questions are graded.`)) {
+                        onClose()
+                      }
+                    }}
+                    className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                  >
+                    Force Close
+                  </Button>
+                </div>
+              </div>
+            )
+          }
+          return null
+        })()}
       </DialogContent>
     </Dialog>
   )

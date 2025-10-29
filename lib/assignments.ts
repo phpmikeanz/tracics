@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/types"
+import { 
+  notifyAssignmentSubmission, 
+  notifyAssignmentGradedEnhanced, 
+  notifyNewAssignmentPublished,
+  getCourseInstructor, 
+  getStudentName, 
+  getAssignmentTitle 
+} from "@/lib/notifications"
 
 type Assignment = Database["public"]["Tables"]["assignments"]["Row"]
 type AssignmentInsert = Database["public"]["Tables"]["assignments"]["Insert"]
@@ -57,6 +65,21 @@ export async function createAssignment(assignment: AssignmentInsert) {
   const { data, error } = await supabase.from("assignments").insert(assignment).select().single()
 
   if (error) throw error
+
+  // Trigger notification for students when new assignment is created
+  if (data) {
+    try {
+      await notifyNewAssignmentPublished(
+        data.course_id,
+        data.title,
+        data.due_date || undefined
+      )
+    } catch (notificationError) {
+      console.error('Error sending new assignment notification:', notificationError)
+      // Don't throw error - notification failure shouldn't break assignment creation
+    }
+  }
+
   return data
 }
 
@@ -191,9 +214,11 @@ export async function submitAssignment(submission: SubmissionInsert) {
   // Check if submission already exists
   const existing = await getSubmissionByStudentAndAssignment(submission.student_id, submission.assignment_id)
   
+  let data: any
+  
   if (existing) {
     // Update existing submission
-    const { data, error } = await supabase
+    const result = await supabase
       .from("assignment_submissions")
       .update({
         ...submission,
@@ -204,11 +229,11 @@ export async function submitAssignment(submission: SubmissionInsert) {
       .select()
       .single()
     
-    if (error) throw error
-    return data
+    if (result.error) throw result.error
+    data = result.data
   } else {
     // Create new submission
-    const { data, error } = await supabase
+    const result = await supabase
       .from("assignment_submissions")
       .insert({
         ...submission,
@@ -218,9 +243,48 @@ export async function submitAssignment(submission: SubmissionInsert) {
       .select()
       .single()
     
-    if (error) throw error
-    return data
+    if (result.error) throw result.error
+    data = result.data
   }
+
+  // Trigger notification for faculty when student submits assignment
+  if (data) {
+    try {
+      // Get assignment details to find course instructor
+      const { data: assignmentData } = await supabase
+        .from('assignments')
+        .select('course_id, title, due_date')
+        .eq('id', submission.assignment_id)
+        .single()
+
+      if (assignmentData) {
+        const instructorId = await getCourseInstructor(assignmentData.course_id)
+        
+        if (instructorId) {
+          const studentName = await getStudentName(submission.student_id)
+          const assignmentTitle = assignmentData.title
+          
+          if (studentName && assignmentTitle) {
+            // Check if submission is late
+            const isLate = assignmentData.due_date && 
+              new Date() > new Date(assignmentData.due_date)
+            
+            await notifyAssignmentSubmission(
+              instructorId,
+              studentName,
+              assignmentTitle,
+              isLate
+            )
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error sending assignment submission notification:', notificationError)
+      // Don't throw error - notification failure shouldn't break submission
+    }
+  }
+
+  return data
 }
 
 export async function gradeSubmission(submissionId: string, grade: number, feedback?: string) {
@@ -234,10 +298,34 @@ export async function gradeSubmission(submissionId: string, grade: number, feedb
       status: "graded"
     })
     .eq("id", submissionId)
-    .select()
+    .select(`
+      *,
+      assignments(title, max_points)
+    `)
     .single()
 
   if (error) throw error
+
+  // Trigger notification for student when assignment is graded
+  if (data) {
+    try {
+      const studentId = data.student_id
+      const assignmentTitle = data.assignments?.title || 'Assignment'
+      const maxPoints = data.assignments?.max_points || 100
+      
+      await notifyAssignmentGradedEnhanced(
+        studentId,
+        assignmentTitle,
+        grade,
+        maxPoints,
+        feedback
+      )
+    } catch (notificationError) {
+      console.error('Error sending assignment graded notification:', notificationError)
+      // Don't throw error - notification failure shouldn't break grading
+    }
+  }
+
   return data
 }
 

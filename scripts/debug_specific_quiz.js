@@ -9,7 +9,7 @@ async function debugSpecificQuiz() {
   try {
     console.log('🔍 DEBUGGING SPECIFIC QUIZ: Computer Programming I');
     console.log('==================================================');
-    console.log('Quiz ID: 6902ea3f-ebe9-418d-ba4c-8a1c3eb5b8c1');
+    console.log('Quiz ID: 61929e66-ffdf-4407-9b74-5d4ba62b25e2');
     console.log('');
     
     // Initialize Supabase client
@@ -17,7 +17,7 @@ async function debugSpecificQuiz() {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhkb2d1anlmYmp2dmV3d290bWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDYyNTksImV4cCI6MjA3Mjg4MjI1OX0.dJBQAU0eHSr1hThSC1eZPpIJwzlqRm7LUfB-p4qepAo";
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    const quizId = '6902ea3f-ebe9-418d-ba4c-8a1c3eb5b8c1';
+    const quizId = '61929e66-ffdf-4407-9b74-5d4ba62b25e2';
     
     // Step 1: Check if quiz exists
     console.log('1️⃣ CHECKING QUIZ EXISTS...');

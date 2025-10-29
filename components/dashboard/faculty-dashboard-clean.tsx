@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
-import { BookOpen, FileText, Bell, LogOut, Plus, BarChart3, Calendar, MessageSquare, Loader2 } from "lucide-react"
+import { BookOpen, FileText, Bell, LogOut, Plus, BarChart3, Calendar, MessageSquare, Loader2, Menu, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { CourseManagement } from "@/components/courses/course-management"
 import { AssignmentManagement } from "@/components/assignments/assignment-management"
@@ -23,6 +23,7 @@ export function FacultyDashboard() {
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Load real data from database
   useEffect(() => {
@@ -62,7 +63,7 @@ export function FacultyDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
+      <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -78,25 +79,9 @@ export function FacultyDashboard() {
               </div>
             </div>
 
-            <nav className="hidden md:flex items-center gap-4 lg:gap-6">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`text-sm font-medium transition-colors px-3 py-2 rounded-md ${
-                    activeTab === tab.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-
             <div className="flex items-center gap-2 sm:gap-3">
               <NotificationCenter />
-              <span className="text-sm font-medium text-foreground">{user?.full_name || user?.name}</span>
+              <span className="hidden sm:block text-sm font-medium text-foreground">{user?.full_name || user?.name}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -109,26 +94,48 @@ export function FacultyDashboard() {
                 <LogOut className="h-4 w-4" />
                 Logout
               </Button>
+              
+              {/* Hamburger Menu Button - Always visible */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </Button>
             </div>
           </div>
 
-          <div className="md:hidden border-t border-border">
-            <div className="flex overflow-x-auto py-2 gap-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`text-xs font-medium px-3 py-2 rounded-md whitespace-nowrap transition-colors ${
-                    activeTab === tab.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          {/* Hamburger Menu Dropdown - Right side positioned */}
+          {isMobileMenuOpen && (
+            <div className="absolute right-4 top-16 w-64 bg-card border border-border rounded-lg shadow-lg z-50">
+              <div className="py-2 space-y-1">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id)
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className={`w-full text-left text-sm font-medium px-4 py-3 rounded-md transition-colors ${
+                      activeTab === tab.id
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </header>
 

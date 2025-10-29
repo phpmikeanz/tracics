@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 import { FileText, Calendar, Clock, CheckCircle, AlertCircle, Upload, Download, Eye, Filter, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { getAssignmentsForStudent, submitAssignment, getSubmissionByStudentAndAssignment } from "@/lib/assignments"
-import { uploadAssignmentFile, downloadAssignmentFile, getFileNameFromUrl } from "@/lib/file-upload"
+import { uploadAssignmentFile, downloadAssignmentFile, getFileNameFromUrl, type FileUploadProgress } from "@/lib/file-upload"
+import { createClient } from "@/lib/supabase/client"
 import { notifyAssignmentSubmitted } from "@/lib/ttrac-notifications"
 import { notifyFacultyAssignmentSubmission, trackStudentActivity } from "@/lib/faculty-activity-notifications"
 import type { Database } from "@/lib/types"
@@ -31,15 +33,31 @@ export function StudentAssignments() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<FileUploadProgress | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false)
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)
   const [isSubmissionDialogOpen, setIsSubmissionDialogOpen] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  
+  const supabase = createClient()
+  const subscriptionRef = useRef<any>(null)
 
   // Load assignments when component mounts
   useEffect(() => {
     if (user?.id) {
       loadAssignments()
+      setupRealtimeSubscriptions()
+    }
+    
+    // Cleanup subscriptions on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe()
+      }
     }
   }, [user?.id])
 
@@ -71,6 +89,91 @@ export function StudentAssignments() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const setupRealtimeSubscriptions = async () => {
+    if (!user?.id) return
+
+    try {
+      // Get student's enrolled courses for filtering
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from("enrollments")
+        .select("course_id")
+        .eq("student_id", user.id)
+        .eq("status", "approved")
+
+      if (enrollmentsError) {
+        console.error('Error getting enrollments for realtime:', enrollmentsError)
+        return
+      }
+
+      if (!enrollments || enrollments.length === 0) return
+
+      const courseIds = enrollments.map(e => e.course_id)
+
+      // Subscribe to assignments table changes
+      const assignmentsSubscription = supabase
+        .channel('assignments_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'assignments',
+            filter: `course_id=in.(${courseIds.join(',')})`
+          },
+          (payload) => {
+            console.log('Assignment change detected:', payload)
+            setLastUpdateTime(new Date())
+            setIsUpdating(true)
+            
+            // Show subtle notification for assignment changes
+            toast({
+              title: "Assignment Updated",
+              description: "Your assignments have been updated with the latest changes.",
+              duration: 3000,
+            })
+            
+            loadAssignments().finally(() => {
+              setTimeout(() => setIsUpdating(false), 1000) // Show animation for 1 second
+            })
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'assignment_submissions',
+            filter: `student_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('Assignment submission change detected:', payload)
+            setLastUpdateTime(new Date())
+            setIsUpdating(true)
+            
+            // Show notification for submission changes (grading, etc.)
+            toast({
+              title: "Submission Updated",
+              description: "Your assignment submission status has been updated.",
+              duration: 3000,
+            })
+            
+            loadAssignments().finally(() => {
+              setTimeout(() => setIsUpdating(false), 1000) // Show animation for 1 second
+            })
+          }
+        )
+        .subscribe((status) => {
+          console.log('Realtime subscription status:', status)
+          setIsRealtimeConnected(status === 'SUBSCRIBED')
+        })
+
+      subscriptionRef.current = assignmentsSubscription
+
+    } catch (error) {
+      console.error('Error setting up realtime subscriptions:', error)
     }
   }
 
@@ -176,12 +279,22 @@ export function StudentAssignments() {
         
         console.log('Processing file:', { name: file.name, size: file.size, type: file.type })
         
+        setIsUploading(true)
+        setUploadProgress({ loaded: 0, total: file.size, percentage: 0 })
+        
         toast({
           title: "Uploading...",
           description: `Uploading ${file.name}, please wait...`,
         })
         
-        const uploadResult = await uploadAssignmentFile(file, user.id, assignmentId)
+        const uploadResult = await uploadAssignmentFile(
+          file, 
+          user.id, 
+          assignmentId,
+          (progress) => {
+            setUploadProgress(progress)
+          }
+        )
         
         if (!uploadResult.success) {
           throw new Error(uploadResult.error || "File upload failed")
@@ -288,6 +401,8 @@ export function StudentAssignments() {
       })
     } finally {
       setSubmitting(false)
+      setIsUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -322,10 +437,38 @@ export function StudentAssignments() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">My Assignments</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-900">My Assignments</h2>
+            {/* Real-time Status Indicator */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-xs text-gray-500">
+                {isRealtimeConnected ? 'Live updates' : 'Offline'}
+              </span>
+            </div>
+          </div>
           <p className="text-gray-600">Track and submit your course assignments</p>
+          {lastUpdateTime && (
+            <p className="text-xs text-gray-400 mt-1">
+              Last updated: {format(lastUpdateTime, 'MMM d, yyyy h:mm a')}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              setIsUpdating(true)
+              loadAssignments().finally(() => {
+                setTimeout(() => setIsUpdating(false), 1000)
+              })
+            }}
+            disabled={isUpdating}
+          >
+            <Loader2 className={`h-4 w-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button variant="outline" size="sm">
             <Filter className="h-4 w-4 mr-2" />
             Filter
@@ -394,7 +537,8 @@ export function StudentAssignments() {
       </div>
 
       {/* Assignments List */}
-      {assignments.length === 0 ? (
+      <div className={`transition-all duration-500 ${isUpdating ? 'opacity-75 scale-[0.99]' : 'opacity-100 scale-100'}`}>
+        {assignments.length === 0 ? (
         <div className="text-center py-12">
           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assignments Yet</h3>
@@ -504,6 +648,7 @@ export function StudentAssignments() {
           })}
         </div>
       )}
+      </div>
 
       {/* Assignment Submission Dialog */}
       <Dialog open={isSubmissionDialogOpen} onOpenChange={setIsSubmissionDialogOpen}>
@@ -583,18 +728,47 @@ export function StudentAssignments() {
                             multiple 
                             className="mt-2"
                             accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip"
+                            disabled={isUploading}
                           />
                         </div>
+                        
+                        {/* Upload Progress */}
+                        {isUploading && uploadProgress && (
+                          <div className="mt-4 space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Uploading file...</span>
+                              <span className="text-gray-500">{Math.round(uploadProgress.percentage)}%</span>
+                            </div>
+                            <Progress 
+                              value={uploadProgress.percentage} 
+                              className="w-full"
+                            />
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <span>
+                                {Math.round(uploadProgress.loaded / 1024)} KB / {Math.round(uploadProgress.total / 1024)} KB
+                              </span>
+                              <span className="flex items-center">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Uploading...
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex justify-end gap-2 pt-4">
                         <Button type="button" variant="outline" onClick={() => setIsSubmissionDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={submitting}>
+                        <Button type="submit" disabled={submitting || isUploading}>
                           {submitting ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               Submitting...
+                            </>
+                          ) : isUploading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Uploading...
                             </>
                           ) : (
                             "Submit Assignment"

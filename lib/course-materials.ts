@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/types"
+import { notifyNewCourseMaterial } from "@/lib/notifications"
 
 type CourseMaterial = Database["public"]["Tables"]["course_materials"]["Row"]
 type CourseMaterialInsert = Database["public"]["Tables"]["course_materials"]["Insert"]
@@ -131,6 +132,22 @@ export async function createCourseMaterial(material: CourseMaterialInsert): Prom
   }
   
   console.log('Course material created successfully:', data)
+  
+  // Trigger notification for students when new course material is uploaded
+  if (data) {
+    try {
+      await notifyNewCourseMaterial(
+        data.course_id,
+        data.title,
+        data.material_type,
+        data.is_required
+      )
+    } catch (notificationError) {
+      console.error('Error sending course material notification:', notificationError)
+      // Don't throw error - notification failure shouldn't break material creation
+    }
+  }
+  
   return data
 }
 

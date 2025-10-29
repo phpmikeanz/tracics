@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { getQuizzesForStudent, getStudentQuizAttempt, startQuizAttempt, getQuizQuestions, forceRefreshStudentQuizAttempt } from "@/lib/quizzes"
 import { QuizTaking } from "./quiz-taking"
+import { QuizResultsView } from "./quiz-results-view"
 import type { Database } from "@/lib/types"
 
 type Quiz = Database["public"]["Tables"]["quizzes"]["Row"] & {
@@ -26,8 +27,8 @@ export function StudentQuizzes() {
   const [loading, setLoading] = useState(true)
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [showResults, setShowResults] = useState(false)
   const [startingQuiz, setStartingQuiz] = useState<string | null>(null)
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
 
   // Helper function to safely format dates
   const safeFormatDate = (dateString: string | null, formatString: string): string => {
@@ -51,26 +52,6 @@ export function StudentQuizzes() {
     }
   }, [user?.id])
 
-  // Auto-refresh effect to check for updated scores
-  useEffect(() => {
-    if (!autoRefreshEnabled || !user?.id) return
-
-    // Check if there are any quizzes that might need grading
-    const hasPendingQuizzes = quizzes.some(quiz => 
-      quiz.attempt?.status === 'completed' || 
-      (quiz.attempt?.score !== null && quiz.attempt?.score !== undefined)
-    )
-
-    if (!hasPendingQuizzes) return
-
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      console.log('Auto-refreshing quizzes to check for updated scores...')
-      loadQuizzes()
-    }, 30000) // 30 seconds
-
-    return () => clearInterval(interval)
-  }, [autoRefreshEnabled, user?.id, quizzes])
 
   const loadQuizzes = async () => {
     if (!user?.id) return
@@ -82,17 +63,14 @@ export function StudentQuizzes() {
       const quizzesData = await getQuizzesForStudent(user.id)
       console.log('Quizzes data from getQuizzesForStudent:', quizzesData)
       
-      // Load attempts and question counts for each quiz
+      // Load attempts and question counts for each quiz (optimized)
       const quizzesWithDetails = await Promise.all(
         quizzesData.map(async (quiz) => {
-          console.log(`Loading details for quiz: ${quiz.title} (${quiz.id})`)
-          
-          // Use force refresh to get the latest attempt data
-          const attempt = await forceRefreshStudentQuizAttempt(user.id, quiz.id)
-          console.log(`Attempt for quiz ${quiz.title}:`, attempt)
-          
-          const questions = await getQuizQuestions(quiz.id)
-          console.log(`Questions for quiz ${quiz.title}:`, questions)
+          // Load attempt and questions in parallel for better performance
+          const [attempt, questions] = await Promise.all([
+            forceRefreshStudentQuizAttempt(user.id, quiz.id),
+            getQuizQuestions(quiz.id)
+          ])
           
           return {
             ...quiz,
@@ -319,7 +297,14 @@ export function StudentQuizzes() {
 
   const handleViewResults = (quiz: Quiz) => {
     setSelectedQuiz(quiz)
+    setShowResults(true)
     setIsDialogOpen(true)
+  }
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false)
+    setShowResults(false)
+    setSelectedQuiz(null)
   }
 
   if (loading) {
@@ -346,16 +331,6 @@ export function StudentQuizzes() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">My Quizzes</h2>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              id="auto-refresh"
-              checked={autoRefreshEnabled}
-              onChange={(e) => setAutoRefreshEnabled(e.target.checked)}
-              className="rounded"
-            />
-            <label htmlFor="auto-refresh">Auto-refresh scores</label>
-          </div>
           <Button
             variant="outline"
             size="sm"
@@ -529,21 +504,33 @@ export function StudentQuizzes() {
         })}
       </div>
 
-      {/* Quiz Taking Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      {/* Quiz Taking/Results Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedQuiz?.title}</DialogTitle>
+            <DialogTitle>
+              {showResults ? `Quiz Results - ${selectedQuiz?.title}` : selectedQuiz?.title}
+            </DialogTitle>
           </DialogHeader>
           {selectedQuiz && selectedQuiz.attempt && (
-            <QuizTaking 
-              quiz={selectedQuiz} 
-              attempt={selectedQuiz.attempt}
-              onComplete={() => {
-                setIsDialogOpen(false)
-                loadQuizzes() // Reload to get updated data
-              }}
-            />
+            <>
+              {showResults ? (
+                <QuizResultsView 
+                  quiz={selectedQuiz} 
+                  attempt={selectedQuiz.attempt}
+                  onClose={handleCloseDialog}
+                />
+              ) : (
+                <QuizTaking 
+                  quiz={selectedQuiz} 
+                  attempt={selectedQuiz.attempt}
+                  onComplete={() => {
+                    handleCloseDialog()
+                    loadQuizzes() // Reload to get updated data
+                  }}
+                />
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>
