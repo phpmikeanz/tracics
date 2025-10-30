@@ -215,7 +215,7 @@ export function FacultyDashboard() {
     { id: "enrollment", label: "Enrollment", icon: FileText },
     { id: "assignments", label: "Assignments", icon: FileText },
     { id: "quizzes", label: "Quizzes", icon: FileText },
-    { id: "activities", label: "Student Activities", icon: Bell },
+    // Hidden: Student Activities
   ]
 
   return (
@@ -340,10 +340,10 @@ export function FacultyDashboard() {
                           {courses.map((course) => (
                             <div
                               key={course.id}
-                              className="flex items-center justify-between p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/50 transition-all duration-200"
+                              className="flex flex-col sm:flex-row sm:items-center items-start justify-between gap-2 sm:gap-3 p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/50 transition-all duration-200 overflow-hidden"
                             >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
+                              <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1 w-full">
+                                <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0 mt-1 sm:mt-0" />
                                 <div className="min-w-0 flex-1">
                                   <h3 className="font-medium text-sm sm:text-base text-foreground truncate">
                                     {course.title}
@@ -353,7 +353,7 @@ export function FacultyDashboard() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="text-right flex-shrink-0 ml-2">
+                              <div className="sm:text-right sm:flex-shrink-0 sm:ml-2 self-start sm:self-auto">
                                 <Badge variant="outline" className="text-xs">
                                   Active
                                 </Badge>

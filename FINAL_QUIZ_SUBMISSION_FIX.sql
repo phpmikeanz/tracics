@@ -178,3 +178,4 @@ SELECT
   'FINAL QUIZ SUBMISSION FIX APPLIED' as status,
   'RLS temporarily disabled on notifications table' as note,
   'Quiz submissions should now work without any RLS errors' as result;
+

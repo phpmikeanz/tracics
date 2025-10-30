@@ -1186,7 +1186,7 @@ export function QuizManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Quiz Management</h2>
           <p className="text-gray-600">Create and manage course quizzes</p>
@@ -1204,7 +1204,7 @@ export function QuizManagement() {
               Create Quiz
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="w-[100vw] max-w-[100vw] sm:max-w-2xl p-3 sm:p-6 max-h-[85vh] overflow-y-auto overflow-x-auto sm:overflow-x-hidden rounded-none sm:rounded-lg">
             <DialogHeader>
               <DialogTitle>Create New Quiz</DialogTitle>
             </DialogHeader>
@@ -1453,7 +1453,7 @@ export function QuizManagement() {
 
       {/* Quiz Details Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="w-[100vw] max-w-[100vw] sm:max-w-6xl p-2 sm:p-6 max-h-[90vh] overflow-y-auto overflow-x-auto sm:overflow-x-hidden rounded-none sm:rounded-lg">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Quiz: {selectedQuiz?.title || 'Loading...'}</DialogTitle>
@@ -1478,7 +1478,7 @@ export function QuizManagement() {
 
           {selectedQuiz && (
           <Tabs defaultValue="questions" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 sticky top-0 bg-background z-10">
               <TabsTrigger value="questions">Questions</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
               <TabsTrigger value="results">Results</TabsTrigger>

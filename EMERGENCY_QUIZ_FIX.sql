@@ -177,3 +177,4 @@ SELECT
 FROM pg_tables 
 WHERE tablename = 'notifications' 
 AND schemaname = 'public';
+

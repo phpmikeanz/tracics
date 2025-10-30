@@ -225,7 +225,7 @@ export function NotificationCenter() {
             </div>
           </SheetTitle>
           <SheetDescription>
-            {user?.role === 'faculty' ? 'Student Activities & Course Updates' : 'Your Assignments, Quizzes & Course Updates'}
+            {user?.role === 'faculty' ? '' : 'Your Assignments, Quizzes & Course Updates'}
           </SheetDescription>
         </SheetHeader>
 

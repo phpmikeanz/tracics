@@ -183,8 +183,8 @@ export function EnrollmentManagement() {
   const RequestCard = ({ enrollment, showActions = false }: { enrollment: EnrollmentWithDetails; showActions?: boolean }) => (
     <Card key={enrollment.id} className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3 flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
             <Avatar className="h-10 w-10">
               <AvatarImage 
                 src={enrollment.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(enrollment.profiles?.full_name || 'Student')}&background=random&color=fff&size=128`} 
@@ -210,19 +210,19 @@ export function EnrollmentManagement() {
                   {enrollment.status}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground mb-1">Student ID: {enrollment.student_id}</p>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-1 truncate">Student ID: {enrollment.student_id}</p>
+              <div className="flex items-center gap-2 sm:gap-4 text-sm text-muted-foreground flex-wrap">
                 <span className="font-medium text-foreground">{enrollment.courses?.title || "Unknown Course"}</span>
                 <span>({enrollment.courses?.course_code || "N/A"})</span>
               </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                <span>Requested: {formatDate(enrollment.created_at)}</span>
-                {enrollment.updated_at !== enrollment.created_at && <span>Updated: {formatDate(enrollment.updated_at)}</span>}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground mt-2">
+                <span className="truncate">Requested: {formatDate(enrollment.created_at)}</span>
+                {enrollment.updated_at !== enrollment.created_at && <span className="truncate">Updated: {formatDate(enrollment.updated_at)}</span>}
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2 ml-4">
+          <div className="flex gap-2 ml-0 sm:ml-4 mt-2 sm:mt-0 flex-wrap w-full sm:w-auto">
             <Button
               size="sm"
               variant="outline"
@@ -270,22 +270,24 @@ export function EnrollmentManagement() {
           </div>
 
           {enrollment.status === "approved" && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                handleRemoveStudent(enrollment.id, enrollment.profiles?.full_name || "Student", enrollment.courses?.title || "Course")
-              }
-              className="ml-4 text-red-600 hover:text-red-700 hover:bg-red-50"
-              disabled={processing === enrollment.id}
-            >
-              {processing === enrollment.id ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <UserMinus className="h-4 w-4 mr-1" />
-              )}
-              Remove
-            </Button>
+            <div className="flex w-full sm:w-auto">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  handleRemoveStudent(enrollment.id, enrollment.profiles?.full_name || "Student", enrollment.courses?.title || "Course")
+                }
+                className="ml-0 sm:ml-4 mt-2 sm:mt-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={processing === enrollment.id}
+              >
+                {processing === enrollment.id ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <UserMinus className="h-4 w-4 mr-1" />
+                )}
+                Remove
+              </Button>
+            </div>
           )}
         </div>
       </CardContent>
@@ -295,7 +297,7 @@ export function EnrollmentManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Enrollment Management</h2>
           <p className="text-muted-foreground">Review and manage student enrollment requests</p>
@@ -330,15 +332,15 @@ export function EnrollmentManagement() {
       {/* Tabs */}
       <Tabs defaultValue="pending" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="pending" className="flex items-center gap-2">
+          <TabsTrigger value="pending" className="flex items-center gap-2 text-xs sm:text-sm">
             <Clock className="h-4 w-4" />
             Pending ({pendingRequests.length})
           </TabsTrigger>
-          <TabsTrigger value="approved" className="flex items-center gap-2">
+          <TabsTrigger value="approved" className="flex items-center gap-2 text-xs sm:text-sm">
             <CheckCircle className="h-4 w-4" />
             Enrolled ({approvedRequests.length})
           </TabsTrigger>
-          <TabsTrigger value="declined" className="flex items-center gap-2">
+          <TabsTrigger value="declined" className="flex items-center gap-2 text-xs sm:text-sm">
             <XCircle className="h-4 w-4" />
             Declined ({declinedRequests.length})
           </TabsTrigger>

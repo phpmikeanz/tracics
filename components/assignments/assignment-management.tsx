@@ -328,7 +328,7 @@ export function AssignmentManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-gray-900">Assignment Management</h2>
@@ -348,7 +348,7 @@ export function AssignmentManagement() {
               Create Assignment
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="w-[100vw] max-w-[100vw] sm:max-w-2xl p-3 sm:p-6 max-h-[85vh] overflow-y-auto overflow-x-auto sm:overflow-x-hidden rounded-none sm:rounded-lg">
             <DialogHeader>
               <DialogTitle>Create New Assignment</DialogTitle>
             </DialogHeader>
@@ -448,12 +448,12 @@ export function AssignmentManagement() {
         {assignments.map((assignment) => (
           <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
                   <CardTitle className="text-lg">{assignment.title}</CardTitle>
                   <p className="text-sm text-gray-600">{assignment.courses?.title || "Course"}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-start sm:self-auto">
                   <Badge variant="outline">
                     Assignment
                   </Badge>
@@ -464,7 +464,7 @@ export function AssignmentManagement() {
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600 line-clamp-2">{assignment.description}</p>
 
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-sm gap-2">
                 <div className="flex items-center gap-1" title="Assignment due date">
                   <CalendarIcon className="h-4 w-4" />
                   <span>Due: {assignment.due_date ? format(new Date(assignment.due_date), "MMM d, yyyy") : "No due date"}</span>
@@ -472,7 +472,7 @@ export function AssignmentManagement() {
                 <span className="font-medium" title="Maximum points for this assignment">{assignment.max_points} pts</span>
               </div>
 
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-sm gap-2">
                 <div className="flex items-center gap-1" title="Number of student submissions received">
                   <Users className="h-4 w-4" />
                   <span>
@@ -492,7 +492,7 @@ export function AssignmentManagement() {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -517,17 +517,17 @@ export function AssignmentManagement() {
 
       {/* Assignment Details Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="w-[100vw] max-w-[100vw] sm:max-w-6xl p-2 sm:p-6 max-h-[90vh] overflow-y-auto overflow-x-auto sm:overflow-x-hidden rounded-none sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>Assignment: {selectedAssignment?.title}</DialogTitle>
           </DialogHeader>
 
           <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="submissions">Submissions</TabsTrigger>
-              <TabsTrigger value="grading">Grading</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 sticky top-0 bg-background z-10 overflow-x-hidden">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="submissions" className="text-xs sm:text-sm">Submissions</TabsTrigger>
+            <TabsTrigger value="grading" className="text-xs sm:text-sm">Grading</TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
@@ -597,12 +597,13 @@ export function AssignmentManagement() {
             </TabsContent>
 
             <TabsContent value="submissions" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Student Submissions</h3>
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h3 className="text-base sm:text-lg font-semibold">Student Submissions</h3>
+                <div className="flex gap-2 flex-nowrap overflow-x-auto w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     size="sm"
+                    className="w-auto whitespace-nowrap"
                     title="Download all submission files as a ZIP archive"
                   >
                     <Download className="h-4 w-4 mr-2" />
@@ -611,6 +612,7 @@ export function AssignmentManagement() {
                   <Button 
                     variant="outline" 
                     size="sm"
+                    className="w-auto whitespace-nowrap"
                     title="Export student grades to CSV/Excel file"
                   >
                     Export Grades
@@ -634,21 +636,21 @@ export function AssignmentManagement() {
                 {submissions.map((submission) => (
                   <Card key={submission.id}>
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <Avatar className="h-10 w-10">
                               <AvatarFallback>
                                 {submission.profiles?.full_name?.charAt(0) || "S"}
                               </AvatarFallback>
                           </Avatar>
-                          <div>
-                              <p className="font-medium">{submission.profiles?.full_name || "Unknown Student"}</p>
-                              <p className="text-sm text-gray-600">Student ID: {submission.student_id}</p>
+                          <div className="min-w-0">
+                              <p className="font-medium truncate">{submission.profiles?.full_name || "Unknown Student"}</p>
+                              <p className="text-sm text-gray-600 truncate break-all">Student ID: {submission.student_id}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-sm font-medium">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                          <div className="text-left sm:text-right w-full sm:w-auto">
+                            <p className="text-sm font-medium break-words">
                                 Submitted: {submission.submitted_at ? format(new Date(submission.submitted_at), "MMM d, yyyy 'at' h:mm a") : "Not submitted"}
                             </p>
                             <div className="flex items-center gap-2 mt-1">
@@ -656,11 +658,12 @@ export function AssignmentManagement() {
                                 {submission.grade && <span className="text-sm font-medium">{submission.grade}/{selectedAssignment?.max_points}</span>}
                               </div>
                           </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-nowrap overflow-x-auto justify-end w-full sm:w-auto">
                               {submission.file_url && (
                                 <Button 
                                   variant="outline" 
                                   size="sm"
+                                  className="w-auto h-9 px-3 whitespace-nowrap"
                                   onClick={async () => {
                                     try {
                                       await downloadAssignmentFile(
@@ -683,6 +686,7 @@ export function AssignmentManagement() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
+                                className="w-auto h-9 px-3 whitespace-nowrap"
                                 onClick={() => {
                                   // Toggle feedback section visibility
                                   const feedbackSection = document.getElementById(`feedback-${submission.id}`)
@@ -822,14 +826,7 @@ export function AssignmentManagement() {
                       <Button 
                         variant="outline"
                         onClick={() => {
-                          // Reset form to original values
-                          const titleInput = document.getElementById('edit-title') as HTMLInputElement
-                          const pointsInput = document.getElementById('edit-points') as HTMLInputElement
-                          const descriptionInput = document.getElementById('edit-description') as HTMLTextAreaElement
-                          
-                          if (titleInput) titleInput.value = selectedAssignment?.title || ""
-                          if (pointsInput) pointsInput.value = selectedAssignment?.max_points?.toString() || ""
-                          if (descriptionInput) descriptionInput.value = selectedAssignment?.description || ""
+                          setIsEditDialogOpen(false)
                         }}
                       >
                         Cancel
@@ -924,21 +921,23 @@ function GradingCard({
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3 min-w-0">
             <Avatar className="h-10 w-10">
               <AvatarFallback>
                 {submission.profiles?.full_name?.charAt(0) || "S"}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <p className="font-medium">{submission.profiles?.full_name || "Unknown Student"}</p>
-              <p className="text-sm text-gray-600">
+            <div className="min-w-0">
+              <p className="font-medium truncate">{submission.profiles?.full_name || "Unknown Student"}</p>
+              <p className="text-sm text-gray-600 truncate">
                 Submitted: {submission.submitted_at ? format(new Date(submission.submitted_at), "MMM d, yyyy 'at' h:mm a") : "Not submitted"}
               </p>
             </div>
           </div>
-          <Badge variant={getSubmissionStatusColor(submission.status)}>{submission.status}</Badge>
+          <div className="sm:self-start">
+            <Badge variant={getSubmissionStatusColor(submission.status)}>{submission.status}</Badge>
+          </div>
         </div>
 
         {submission.content && (
@@ -951,8 +950,8 @@ function GradingCard({
         {submission.file_url && (
           <div className="mb-4 p-3 bg-blue-50 rounded-lg">
             <Label className="text-sm font-medium text-blue-700">Attached File:</Label>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-sm text-blue-800">{getFileNameFromUrl(submission.file_url)}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2">
+              <span className="text-sm text-blue-800 truncate">{getFileNameFromUrl(submission.file_url)}</span>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -1000,12 +999,12 @@ function GradingCard({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" size="sm">
+        <div className="flex justify-end gap-2 mt-4 flex-wrap">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
-          <Button size="sm" onClick={handleSaveGrade} disabled={saving || !grade}>
+          <Button size="sm" onClick={handleSaveGrade} disabled={saving || !grade} className="w-full sm:w-auto">
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -208,3 +208,4 @@ SELECT
   'TARGETED QUIZ FIX APPLIED' as status,
   'Most permissive RLS policies created' as note,
   'Quiz submissions should now work without errors' as result;
+

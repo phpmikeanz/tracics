@@ -220,13 +220,14 @@ export function FacultyActivityDashboard() {
         .select(`
           id,
           created_at,
+          updated_at,
           status,
           courses!inner(title),
           profiles!inner(full_name, avatar_url)
         `)
         .in("course_id", courseIds)
-        .order("created_at", { ascending: false })
-        .limit(20)
+        .order("updated_at", { ascending: false })
+        .limit(100)
 
       if (!enrollmentsError && enrollments) {
         enrollments.forEach((enrollment: any) => {
@@ -240,37 +241,103 @@ export function FacultyActivityDashboard() {
               student_avatar_url: student.avatar_url,
               activity_type: `Enrollment ${enrollment.status === 'approved' ? 'Approved' : 'Requested'}`,
               course_title: course.title,
-              timestamp: enrollment.created_at,
+              timestamp: enrollment.updated_at || enrollment.created_at,
               status: enrollment.status === 'approved' ? 'completed' : 'new'
             })
           }
         })
       }
 
+      // Always merge in bell notifications to ensure parity with the bell
+      const notifications = await getUserNotifications(user.id)
+      const enrichedFromNotifications: FacultyActivity[] = []
+      for (const n of notifications as any[]) {
+        const createdAt = n.created_at || n.createdAt
+        if (n.type === 'quiz' && n.attempt_id) {
+          // Enrich from real quiz attempt to get real student/quiz/course data
+          const { data: attempt } = await supabase
+            .from('quiz_attempts')
+            .select(`
+              id,
+              completed_at,
+              started_at,
+              score,
+              quizzes!inner(title, max_score, courses!inner(title)),
+              profiles!inner(full_name, avatar_url)
+            `)
+            .eq('id', n.attempt_id)
+            .single()
+
+          if (attempt) {
+            const a: any = attempt
+            enrichedFromNotifications.push({
+              id: `notif-${n.id}`,
+              student_name: a.profiles?.full_name || 'Student',
+              student_avatar_url: a.profiles?.avatar_url,
+              activity_type: 'Quiz Completed',
+              course_title: a.quizzes?.courses?.title || 'Course',
+              quiz_title: a.quizzes?.title,
+              timestamp: a.completed_at || a.started_at || createdAt,
+              score: a.score,
+              max_score: a.quizzes?.max_score,
+              status: 'completed'
+            })
+            continue
+          }
+        }
+
+        const enrollmentType = (n.type === 'enrollment')
+          ? (typeof n.message === 'string' && n.message.toLowerCase().includes('approved')
+              ? 'Enrollment Approved'
+              : (typeof n.message === 'string' && (n.message.toLowerCase().includes('request') || n.message.toLowerCase().includes('requested'))
+                  ? 'Enrollment Requested'
+                  : 'Enrollment'))
+          : undefined
+
+        enrichedFromNotifications.push({
+          id: `notif-${n.id}`,
+          student_name: n.title || 'Notification',
+          activity_type: (n.type === 'quiz') ? 'Quiz Completed' :
+                         (n.type === 'assignment') ? 'Assignment Submitted' :
+                         (n.type === 'enrollment') ? (enrollmentType as string) : 'Activity',
+          course_title: n.course_title || n.courseName || 'Course',
+          timestamp: createdAt,
+          status: 'completed'
+        } as FacultyActivity)
+      }
+      allActivities.push(...enrichedFromNotifications)
+
+      // De-duplicate by id to avoid double counting
+      const uniqueById = new Map<string, FacultyActivity>()
+      for (const act of allActivities) {
+        uniqueById.set(act.id, act)
+      }
+      const mergedActivities = Array.from(uniqueById.values())
+
       // Sort activities by timestamp (most recent first)
-      allActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      mergedActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       
       // Calculate statistics
       const today = new Date()
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
       
-      const todayActivities = allActivities.filter(a => {
+      const todayActivities = mergedActivities.filter(a => {
         const activityDate = new Date(a.timestamp)
         return activityDate >= todayStart && activityDate < todayEnd
       })
       
       const stats = {
-        total: allActivities.length,
-        assignments: allActivities.filter(a => a.activity_type.includes("Assignment")).length,
-        quizzes: allActivities.filter(a => a.activity_type.includes("Quiz")).length,
-        enrollments: allActivities.filter(a => a.activity_type.includes("Enrollment")).length,
+        total: mergedActivities.length,
+        assignments: mergedActivities.filter(a => a.activity_type.includes("Assignment")).length,
+        quizzes: mergedActivities.filter(a => a.activity_type.includes("Quiz")).length,
+        enrollments: mergedActivities.filter(a => a.activity_type.includes("Enrollment")).length,
         today: todayActivities.length,
-        late: allActivities.filter(a => a.is_late).length
+        late: mergedActivities.filter(a => a.is_late).length
       }
       
       setStats(stats)
-      setActivities(allActivities.slice(0, 100)) // Limit to 100 most recent activities
+      setActivities(mergedActivities.slice(0, 100)) // Limit to 100 most recent activities
     } catch (error) {
       console.error("Error loading faculty activities:", error)
       toast({
@@ -323,16 +390,16 @@ export function FacultyActivityDashboard() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CardTitle className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Bell className="h-5 w-5" />
-              Student Activity Notifications
+              <span className="truncate">Student Activity Notifications</span>
             </CardTitle>
             {synchronizedCount > 0 && (
               <Badge 
                 variant="destructive" 
-                className="bg-red-500 text-white px-3 py-1 text-sm font-semibold animate-pulse"
+                className="bg-red-500 text-white px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-semibold animate-pulse"
               >
                 {synchronizedCount} New
               </Badge>
@@ -348,18 +415,18 @@ export function FacultyActivityDashboard() {
             }}
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''} sm:mr-2`} />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
         
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          <div className="bg-blue-50 p-3 sm:p-4 rounded-lg">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-blue-600">Total Activities</p>
-                <p className="text-2xl font-bold text-blue-700">{stats.total}</p>
+                <p className="text-xs sm:text-sm font-medium text-blue-600">Total Activities</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.total}</p>
               </div>
               <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <span className="text-blue-600 font-semibold text-sm">📊</span>
@@ -367,11 +434,11 @@ export function FacultyActivityDashboard() {
             </div>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
+          <div className="bg-green-50 p-3 sm:p-4 rounded-lg">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-green-600">Assignment Submissions</p>
-                <p className="text-2xl font-bold text-green-700">{stats.assignments}</p>
+                <p className="text-xs sm:text-sm font-medium text-green-600">Assignment Submissions</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.assignments}</p>
               </div>
               <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
                 <span className="text-green-600 font-semibold text-sm">📚</span>
@@ -379,11 +446,11 @@ export function FacultyActivityDashboard() {
             </div>
           </div>
 
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
+          <div className="bg-purple-50 p-3 sm:p-4 rounded-lg">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-purple-600">Quiz Completions</p>
-                <p className="text-2xl font-bold text-purple-700">{stats.quizzes}</p>
+                <p className="text-xs sm:text-sm font-medium text-purple-600">Quiz Completions</p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-700">{stats.quizzes}</p>
               </div>
               <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
                 <span className="text-purple-600 font-semibold text-sm">📝</span>
@@ -391,11 +458,11 @@ export function FacultyActivityDashboard() {
             </div>
           </div>
 
-          <div className="bg-orange-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
+          <div className="bg-orange-50 p-3 sm:p-4 rounded-lg">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-orange-600">Enrollment Requests</p>
-                <p className="text-2xl font-bold text-orange-700">{stats.enrollments}</p>
+                <p className="text-xs sm:text-sm font-medium text-orange-600">Enrollment Requests</p>
+                <p className="text-xl sm:text-2xl font-bold text-orange-700">{stats.enrollments}</p>
               </div>
               <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
                 <span className="text-orange-600 font-semibold text-sm">👥</span>
@@ -405,12 +472,12 @@ export function FacultyActivityDashboard() {
         </div>
         
         {/* Additional Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Notifications</p>
-                <p className="text-2xl font-bold text-gray-700">{synchronizedCount}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Total Notifications</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-700">{synchronizedCount}</p>
               </div>
               <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
                 <span className="text-gray-600 font-semibold text-sm">📊</span>
@@ -418,11 +485,11 @@ export function FacultyActivityDashboard() {
             </div>
           </div>
 
-          <div className="bg-red-50 p-4 rounded-lg">
+          <div className="bg-red-50 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-red-600">Late Submissions</p>
-                <p className="text-2xl font-bold text-red-700">{stats.late || 0}</p>
+                <p className="text-xs sm:text-sm font-medium text-red-600">Late Submissions</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-700">{stats.late || 0}</p>
               </div>
               <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
                 <span className="text-red-600 font-semibold text-sm">⚠️</span>
@@ -430,11 +497,11 @@ export function FacultyActivityDashboard() {
             </div>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-lg">
+          <div className="bg-green-50 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600">Today's Activities</p>
-                <p className="text-2xl font-bold text-green-700">{stats.today}</p>
+                <p className="text-xs sm:text-sm font-medium text-green-600">Today's Activities</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-700">{stats.today}</p>
               </div>
               <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
                 <span className="text-green-600 font-semibold text-sm">📅</span>
@@ -442,11 +509,11 @@ export function FacultyActivityDashboard() {
             </div>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="bg-blue-50 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-600">Unread</p>
-                <p className="text-2xl font-bold text-blue-700">{synchronizedCount}</p>
+                <p className="text-xs sm:text-sm font-medium text-blue-600">Unread</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-700">{synchronizedCount}</p>
               </div>
               <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <span className="text-blue-600 font-semibold text-sm">🔔</span>
@@ -457,12 +524,12 @@ export function FacultyActivityDashboard() {
       </CardHeader>
       <CardContent>
         <Tabs value={filter} onValueChange={(value) => setFilter(value as any)}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="assignments">Assignments</TabsTrigger>
-            <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
-            <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
-            <TabsTrigger value="activities">Activities</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            <TabsTrigger value="all" className="text-xs sm:text-sm py-2">All</TabsTrigger>
+            <TabsTrigger value="assignments" className="text-xs sm:text-sm py-2">Assignments</TabsTrigger>
+            <TabsTrigger value="quizzes" className="text-xs sm:text-sm py-2">Quizzes</TabsTrigger>
+            <TabsTrigger value="enrollments" className="text-xs sm:text-sm py-2">Enrollments</TabsTrigger>
+            <TabsTrigger value="activities" className="text-xs sm:text-sm py-2">Activities</TabsTrigger>
           </TabsList>
           
           <TabsContent value={filter} className="mt-4">
@@ -481,7 +548,7 @@ export function FacultyActivityDashboard() {
                   {filteredActivities.map((activity) => (
                     <div
                       key={activity.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border bg-card"
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-lg border bg-card"
                     >
                       <div className="flex-shrink-0 mt-1">
                         <Avatar className="h-8 w-8">
@@ -495,22 +562,41 @@ export function FacultyActivityDashboard() {
                         </Avatar>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{activity.student_name}</span>
-                          <Badge variant={getActivityColor(activity.activity_type, activity.status)}>
-                            {activity.activity_type}
-                          </Badge>
-                          {activity.is_late && (
-                            <Badge variant="destructive" className="text-xs">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Late
+                        {/* Title row: mimic notification bell style */}
+                        {activity.activity_type.includes('Quiz') ? (
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-sm">Quiz Completed</span>
+                            <Badge variant="secondary" className="text-[10px] uppercase">quiz</Badge>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium text-sm truncate max-w-[60vw] sm:max-w-none">{activity.student_name}</span>
+                            <Badge variant={getActivityColor(activity.activity_type, activity.status)}>
+                              {activity.activity_type}
                             </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-1">
-                          {activity.assignment_title && `Assignment: ${activity.assignment_title}`}
-                          {activity.quiz_title && `Quiz: ${activity.quiz_title}`}
-                        </p>
+                            {activity.is_late && (
+                              <Badge variant="destructive" className="text-xs">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Late
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Details line */}
+                        {activity.activity_type.includes('Quiz') ? (
+                          <p className="text-sm text-muted-foreground mb-1 truncate">
+                            {activity.student_name} • {activity.quiz_title || 'Quiz'}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mb-1 truncate">
+                            {activity.assignment_title && `Assignment: ${activity.assignment_title}`}
+                            {activity.quiz_title && `Quiz: ${activity.quiz_title}`}
+                          </p>
+                        )}
+
+                        {/* Date/time */}
                         <p className="text-xs text-muted-foreground">
                           {activity.course_title} • {format(new Date(activity.timestamp), "MMM d, yyyy 'at' h:mm a")}
                         </p>
@@ -520,11 +606,11 @@ export function FacultyActivityDashboard() {
                           </p>
                         )}
                       </div>
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 w-full sm:w-auto">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 px-3 text-xs hover:bg-primary hover:text-primary-foreground transition-colors"
+                          className="h-7 px-3 text-xs hover:bg-primary hover:text-primary-foreground transition-colors w-full sm:w-auto"
                           onClick={() => {
                             // Navigate based on activity type
                             if (activity.activity_type.includes('Assignment')) {

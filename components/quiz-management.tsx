@@ -117,6 +117,7 @@ export function QuizManagement() {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState<Question>({
@@ -401,13 +402,13 @@ export function QuizManagement() {
 
       {/* Quiz Details Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="w-[100vw] max-w-[100vw] sm:max-w-6xl p-2 sm:p-6 max-h-[90vh] overflow-y-auto overflow-x-auto sm:overflow-x-hidden rounded-none sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>Quiz: {selectedQuiz?.title}</DialogTitle>
           </DialogHeader>
 
           <Tabs defaultValue="questions" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 sticky top-0 bg-background z-10">
               <TabsTrigger value="questions">Questions</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
               <TabsTrigger value="results">Results</TabsTrigger>
@@ -417,14 +418,14 @@ export function QuizManagement() {
             <TabsContent value="questions" className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Quiz Questions</h3>
-                <Dialog>
+                <Dialog open={isAddQuestionDialogOpen} onOpenChange={setIsAddQuestionDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Question
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-3xl">
+                  <DialogContent className="w-[100vw] max-w-[100vw] sm:max-w-3xl p-3 sm:p-6 max-h-[85vh] overflow-y-auto overflow-x-auto sm:overflow-x-hidden rounded-none sm:rounded-lg">
                     <DialogHeader>
                       <DialogTitle>Add New Question</DialogTitle>
                     </DialogHeader>
@@ -538,7 +539,7 @@ export function QuizManagement() {
                       </div>
 
                       <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline">
+                        <Button type="button" variant="outline" onClick={() => setIsAddQuestionDialogOpen(false)}>
                           Cancel
                         </Button>
                         <Button
@@ -553,6 +554,7 @@ export function QuizManagement() {
                                 correctAnswer: "",
                                 points: 1,
                               })
+                              setIsAddQuestionDialogOpen(false)
                             }
                           }}
                         >
@@ -684,7 +686,7 @@ export function QuizManagement() {
                   </div>
 
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline">Cancel</Button>
+                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
                     <Button>Save Changes</Button>
                   </div>
                 </CardContent>

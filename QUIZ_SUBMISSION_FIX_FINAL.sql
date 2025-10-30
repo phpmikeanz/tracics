@@ -207,3 +207,4 @@ SELECT
   'QUIZ SUBMISSION FIX APPLIED SUCCESSFULLY' as status,
   'Students can now submit quizzes without RLS errors' as message,
   'Notifications will be created automatically via database triggers' as note;
+

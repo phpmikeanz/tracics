@@ -8,7 +8,7 @@ export interface Notification {
   id: string
   title: string
   message: string
-  type: "assignment" | "grade" | "announcement" | "quiz" | "general" | "enrollment"
+  type: "assignment" | "grade" | "announcement" | "quiz" | "general" | "enrollment" | "activity"
   read: boolean
   createdAt: Date
   courseId?: string
@@ -73,7 +73,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         id: notification.id,
         title: notification.title,
         message: notification.message,
-        type: notification.type as "assignment" | "grade" | "announcement" | "quiz" | "enrollment",
+        type: notification.type as "assignment" | "grade" | "announcement" | "quiz" | "enrollment" | "activity",
         read: notification.read,
         createdAt: new Date(notification.created_at),
         courseId: "", // Will be populated from course data if needed

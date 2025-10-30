@@ -49,3 +49,4 @@ After applying the fix, test by:
 - `lib/quizzes.ts` - Quiz submission logic
 - `components/quizzes/quiz-taking.tsx` - Quiz taking interface
 - Database triggers in `lib/notification-triggers.sql`
+

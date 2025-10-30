@@ -60,3 +60,4 @@ async function applyQuizRLSFix() {
 
 // Run the fix
 applyQuizRLSFix();
+

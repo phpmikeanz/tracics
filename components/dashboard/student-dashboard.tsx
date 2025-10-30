@@ -191,10 +191,10 @@ export function StudentDashboard() {
                           {courses.map((course) => (
                             <div
                               key={course.id}
-                              className="flex items-center justify-between p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/50 transition-all duration-200"
+                              className="flex flex-col sm:flex-row sm:items-center items-start justify-between gap-2 sm:gap-3 p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/50 transition-all duration-200 overflow-hidden"
                             >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
+                              <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1 w-full">
+                                <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0 mt-1 sm:mt-0" />
                                 <div className="min-w-0 flex-1">
                                   <h3 className="font-medium text-sm sm:text-base text-foreground truncate">
                                     {course.title}

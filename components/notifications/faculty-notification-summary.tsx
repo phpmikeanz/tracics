@@ -24,7 +24,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useFacultyNotifications } from "@/hooks/use-faculty-notifications"
 import { getRealStudentActivities, getRealActivitySummary } from "@/lib/real-student-activities"
 import { checkDatabaseNotifications, createRealNotification, getNotificationStats } from "@/lib/check-database-notifications"
-import { getUnreadNotificationsCount } from "@/lib/notifications"
+import { getUnreadNotificationsCount, getUserNotifications } from "@/lib/notifications"
 import { useToast } from "@/hooks/use-toast"
 
 interface NotificationSummary {
@@ -74,14 +74,20 @@ export function FacultyNotificationSummary({ onNavigateToTab }: FacultyNotificat
       // Get accurate unread count from database
       const accurateUnreadCount = await getUnreadNotificationsCount(user.id)
       
-      // Update summary with real data (with fallbacks for empty data)
+      // Always merge in bell-derived counts to ensure parity
+      const notifications = await getUserNotifications(user.id)
+      const notifAssignments = notifications.filter((n: any) => n.type === 'assignment').length
+      const notifQuizzes = notifications.filter((n: any) => n.type === 'quiz').length
+      const notifEnrollments = notifications.filter((n: any) => n.type === 'enrollment').length
+      const notifActivities = notifications.filter((n: any) => n.type === 'activity').length
+
       setSummary({
-        total: activitySummary.total || 0,
+        total: Math.max(activitySummary.total || 0, notifications.length),
         unread: accurateUnreadCount || 0,
-        assignments: activitySummary.assignments || 0,
-        quizzes: activitySummary.quizzes || 0,
-        enrollments: activitySummary.enrollments || 0,
-        activities: activities.length || 0,
+        assignments: Math.max(activitySummary.assignments || 0, notifAssignments),
+        quizzes: Math.max(activitySummary.quizzes || 0, notifQuizzes),
+        enrollments: Math.max(activitySummary.enrollments || 0, notifEnrollments),
+        activities: Math.max(activities.length || 0, notifActivities),
         late: activitySummary.late || 0,
         today: activitySummary.today || 0
       })

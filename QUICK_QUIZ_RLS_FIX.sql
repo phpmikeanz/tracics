@@ -164,3 +164,4 @@ END $$;
 SELECT 
   'RLS Fix Applied Successfully' as status,
   'Students can now submit quizzes without RLS errors' as message;
+
