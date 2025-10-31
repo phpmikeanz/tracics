@@ -334,6 +334,12 @@
     }
   }
   
+  /* Touch manipulation for better mobile responsiveness */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
   /* High DPI display optimizations */
   @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
     .high-dpi {

@@ -141,29 +141,29 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 py-0 px-24">
-      <div className="max-w-md mx-auto w-96">
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-primary p-3 rounded-full shadow-lg">
-              <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
+    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8">
+      <div className="w-full max-w-sm sm:max-w-md mx-auto px-2 sm:px-4">
+        <div className="text-center mb-4 sm:mb-6 md:mb-8">
+          <div className="flex items-center justify-center mb-3 sm:mb-4">
+            <div className="bg-primary p-2.5 sm:p-3 rounded-full shadow-lg">
+              <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10" />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">TTRAC </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base">Tawi-Tawi Regional Agricultural College</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">TTRAC</h1>
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-sm md:text-base">Tawi-Tawi Regional Agricultural College</p>
           <p className="text-xs sm:text-sm text-muted-foreground">Institute Computing Studies</p>
         </div>
 
         <Card className="shadow-xl border-0 bg-card/95 backdrop-blur-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg sm:text-xl text-center">Welcome Back</CardTitle>
-            <CardDescription className="text-center text-sm">
+          <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
+            <CardTitle className="text-base sm:text-lg md:text-xl text-center">Welcome Back</CardTitle>
+            <CardDescription className="text-center text-xs sm:text-sm">
               Sign in to your account or create a new one
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-4 sm:px-6">
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6 h-9 sm:h-10">
                 <TabsTrigger value="login" className="text-xs sm:text-sm">
                   Sign In
                 </TabsTrigger>
@@ -175,9 +175,9 @@ export function LoginForm() {
               <TabsContent value="login">
                 {!showForgotPassword ? (
                   <>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium">
+                    <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="email" className="text-xs sm:text-sm font-medium">
                           Email
                         </Label>
                         <Input
@@ -185,12 +185,12 @@ export function LoginForm() {
                           name="email"
                           type="email"
                           placeholder="Enter your email"
-                          className="h-11"
+                          className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                           required
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password" className="text-sm font-medium">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="password" className="text-xs sm:text-sm font-medium">
                           Password
                         </Label>
                         <Input
@@ -198,7 +198,7 @@ export function LoginForm() {
                           name="password"
                           type="password"
                           placeholder="Enter your password"
-                          className="h-11"
+                          className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                           required
                         />
                       </div>
@@ -206,26 +206,26 @@ export function LoginForm() {
                         <button
                           type="button"
                           onClick={() => setShowForgotPassword(true)}
-                          className="text-sm text-primary hover:underline"
+                          className="text-xs sm:text-sm text-primary hover:underline touch-manipulation py-1"
                         >
                           Forgot password?
                         </button>
                       </div>
                       {error && (
-                        <div className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive/20">
+                        <div className="text-xs sm:text-sm text-destructive-foreground bg-destructive/10 p-2.5 sm:p-3 rounded-md border border-destructive/20">
                           {error}
                         </div>
                       )}
                       {success && (
-                        <div className="text-sm text-green-700 bg-green-50 p-3 rounded-md border border-green-200">
+                        <div className="text-xs sm:text-sm text-green-700 bg-green-50 p-2.5 sm:p-3 rounded-md border border-green-200">
                           {success}
                         </div>
                       )}
-                      <Button type="submit" className="w-full h-11 text-sm font-medium" disabled={isLoading}>
+                      <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled={isLoading}>
                         {isLoading ? (
                           <>
                             <LoadingSpinner size="sm" />
-                            Signing in...
+                            <span className="ml-2">Signing in...</span>
                           </>
                         ) : (
                           "Sign In"
@@ -234,34 +234,34 @@ export function LoginForm() {
                     </form>
                   </>
                 ) : (
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
-                    <div className="text-center mb-4">
-                      <h3 className="text-lg font-semibold mb-2">Reset Your Password</h3>
-                      <p className="text-sm text-muted-foreground">
+                  <form onSubmit={handleForgotPassword} className="space-y-3 sm:space-y-4">
+                    <div className="text-center mb-3 sm:mb-4">
+                      <h3 className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2">Reset Your Password</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         Enter your email address and we'll send you a link to reset your password.
                       </p>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reset-email" className="text-sm font-medium">
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label htmlFor="reset-email" className="text-xs sm:text-sm font-medium">
                         Email
                       </Label>
                       <Input
                         id="reset-email"
                         type="email"
                         placeholder="Enter your email"
-                        className="h-11"
+                        className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
                         required
                       />
                     </div>
                     {error && (
-                      <div className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive/20">
+                      <div className="text-xs sm:text-sm text-destructive-foreground bg-destructive/10 p-2.5 sm:p-3 rounded-md border border-destructive/20">
                         {error}
                       </div>
                     )}
                     {success && (
-                      <div className="text-sm text-green-700 bg-green-50 p-3 rounded-md border border-green-200">
+                      <div className="text-xs sm:text-sm text-green-700 bg-green-50 p-2.5 sm:p-3 rounded-md border border-green-200">
                         {success}
                       </div>
                     )}
@@ -269,7 +269,7 @@ export function LoginForm() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="flex-1 h-11 text-sm"
+                        className="flex-1 h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
                         onClick={() => {
                           setShowForgotPassword(false)
                           setError("")
@@ -280,11 +280,11 @@ export function LoginForm() {
                       >
                         Back
                       </Button>
-                      <Button type="submit" className="flex-1 h-11 text-sm font-medium" disabled={isSendingReset}>
+                      <Button type="submit" className="flex-1 h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled={isSendingReset}>
                         {isSendingReset ? (
                           <>
                             <LoadingSpinner size="sm" />
-                            Sending...
+                            <span className="ml-2">Sending...</span>
                           </>
                         ) : (
                           "Send Reset Link"
@@ -294,9 +294,9 @@ export function LoginForm() {
                   </form>
                 )}
 
-                <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
-                  <p className="text-sm text-primary font-medium mb-3">Getting Started:</p>
-                  <div className="space-y-2 text-xs sm:text-sm text-primary/80">
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-primary/5 rounded-lg border border-primary/10">
+                  <p className="text-xs sm:text-sm text-primary font-medium mb-2 sm:mb-3">Getting Started:</p>
+                  <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-primary/80">
                     <p>
                       Create a new account using the Sign Up tab, or contact your administrator for login credentials.
                     </p>
@@ -305,9 +305,9 @@ export function LoginForm() {
               </TabsContent>
 
               <TabsContent value="signup">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium">
+                <form onSubmit={handleSignup} className="space-y-3 sm:space-y-4">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="name" className="text-xs sm:text-sm font-medium">
                       Full Name
                     </Label>
                     <Input
@@ -315,12 +315,12 @@ export function LoginForm() {
                       name="name"
                       type="text"
                       placeholder="Enter your full name"
-                      className="h-11"
+                      className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm font-medium">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-email" className="text-xs sm:text-sm font-medium">
                       Email
                     </Label>
                     <Input
@@ -328,12 +328,12 @@ export function LoginForm() {
                       name="email"
                       type="email"
                       placeholder="Enter your email"
-                      className="h-11"
+                      className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="signup-password" className="text-xs sm:text-sm font-medium">
                       Password
                     </Label>
                     <Input
@@ -341,17 +341,17 @@ export function LoginForm() {
                       name="password"
                       type="password"
                       placeholder="Create a password (min. 6 characters)"
-                      className="h-11"
+                      className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                       required
                       minLength={6}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role" className="text-sm font-medium">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="role" className="text-xs sm:text-sm font-medium">
                       Role
                     </Label>
                     <Select name="role" required>
-                      <SelectTrigger className="h-11">
+                      <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
                         <SelectValue placeholder="Select your role" />
                       </SelectTrigger>
                       <SelectContent>
@@ -361,20 +361,20 @@ export function LoginForm() {
                     </Select>
                   </div>
                   {error && (
-                    <div className="text-sm text-destructive-foreground bg-destructive/10 p-3 rounded-md border border-destructive/20">
+                    <div className="text-xs sm:text-sm text-destructive-foreground bg-destructive/10 p-2.5 sm:p-3 rounded-md border border-destructive/20">
                       {error}
                     </div>
                   )}
                   {success && (
-                    <div className="text-sm text-green-700 bg-green-50 p-3 rounded-md border border-green-200">
+                    <div className="text-xs sm:text-sm text-green-700 bg-green-50 p-2.5 sm:p-3 rounded-md border border-green-200">
                       {success}
                     </div>
                   )}
-                  <Button type="submit" className="w-full h-11 text-sm font-medium" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled={isLoading}>
                     {isLoading ? (
                       <>
                         <LoadingSpinner size="sm" />
-                        Creating account...
+                        <span className="ml-2">Creating account...</span>
                       </>
                     ) : (
                       "Create Account"
