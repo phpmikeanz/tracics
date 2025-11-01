@@ -68,3 +68,4 @@ GRANT EXECUTE ON FUNCTION cleanup_old_notifications() TO authenticated;
 
 
 
+
