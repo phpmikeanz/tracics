@@ -18,6 +18,7 @@ type Quiz = Database["public"]["Tables"]["quizzes"]["Row"] & {
   courses?: { title: string; course_code: string } | null
   attempt?: Database["public"]["Tables"]["quiz_attempts"]["Row"] | null
   questionCount?: number
+  totalPoints?: number
 }
 
 export function StudentQuizzes() {
@@ -43,6 +44,38 @@ export function StudentQuizzes() {
     } catch (error) {
       console.warn('Error formatting date:', dateString, error)
       return 'Invalid date'
+    }
+  }
+
+  // Helper function to get grade color based on percentage
+  const getGradeColor = (percentage: number) => {
+    if (percentage >= 80) {
+      return {
+        bg: 'bg-green-50',
+        border: 'border-green-200',
+        text: 'text-green-800',
+        textBold: 'text-green-700',
+        textLight: 'text-green-600',
+        badge: 'bg-green-600'
+      }
+    } else if (percentage >= 60) {
+      return {
+        bg: 'bg-orange-50',
+        border: 'border-orange-200',
+        text: 'text-orange-800',
+        textBold: 'text-orange-700',
+        textLight: 'text-orange-600',
+        badge: 'bg-orange-600'
+      }
+    } else {
+      return {
+        bg: 'bg-red-50',
+        border: 'border-red-200',
+        text: 'text-red-800',
+        textBold: 'text-red-700',
+        textLight: 'text-red-600',
+        badge: 'bg-red-600'
+      }
     }
   }
 
@@ -72,10 +105,14 @@ export function StudentQuizzes() {
             getQuizQuestions(quiz.id)
           ])
           
+          // Calculate total points from questions
+          const totalPoints = questions.reduce((sum, q) => sum + (q.points || 0), 0)
+          
           return {
             ...quiz,
             attempt,
-            questionCount: questions.length
+            questionCount: questions.length,
+            totalPoints
           }
         })
       )
@@ -420,35 +457,40 @@ export function StudentQuizzes() {
                   </div>
                 )}
 
-                {quiz.attempt?.score !== null && quiz.attempt?.score !== undefined && (status === 'completed' || status === 'completed_closed') && (
-                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-lg font-semibold text-green-800">Quiz Results</h4>
-                      <Badge variant="default" className="bg-green-600 text-white">
-                        Graded
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-2xl font-bold text-green-700">{quiz.attempt.score}</p>
-                        <p className="text-sm text-green-600">Points Earned</p>
+                {quiz.attempt?.score !== null && quiz.attempt?.score !== undefined && (status === 'completed' || status === 'completed_closed') && (() => {
+                  const percentage = quiz.totalPoints && quiz.totalPoints > 0 
+                    ? Math.round((quiz.attempt.score / quiz.totalPoints) * 100) 
+                    : 0
+                  const colors = getGradeColor(percentage)
+                  
+                  return (
+                    <div className={`mb-4 p-4 ${colors.bg} border ${colors.border} rounded-lg`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className={`text-lg font-semibold ${colors.text}`}>Quiz Results</h4>
+                        <Badge variant="default" className={`${colors.badge} text-white`}>
+                          Graded
+                        </Badge>
                       </div>
-                      <div>
-                        <p className="text-2xl font-bold text-green-700">
-                          {quiz.questionCount && quiz.questionCount > 0 
-                            ? Math.round((quiz.attempt.score / (quiz.questionCount * 10)) * 100) 
-                            : 0}%
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className={`text-2xl font-bold ${colors.textBold}`}>{quiz.attempt.score}</p>
+                          <p className={`text-sm ${colors.textLight}`}>Points Earned</p>
+                        </div>
+                        <div>
+                          <p className={`text-2xl font-bold ${colors.textBold}`}>
+                            {percentage}%
+                          </p>
+                          <p className={`text-sm ${colors.textLight}`}>Percentage</p>
+                        </div>
+                      </div>
+                      {quiz.attempt.completed_at && (
+                        <p className={`text-xs ${colors.textLight} mt-2`}>
+                          Completed: {safeFormatDate(quiz.attempt.completed_at, "MMM d, yyyy 'at' h:mm a")}
                         </p>
-                        <p className="text-sm text-green-600">Percentage</p>
-                      </div>
+                      )}
                     </div>
-                    {quiz.attempt.completed_at && (
-                      <p className="text-xs text-green-600 mt-2">
-                        Completed: {safeFormatDate(quiz.attempt.completed_at, "MMM d, yyyy 'at' h:mm a")}
-                      </p>
-                    )}
-                  </div>
-                )}
+                  )
+                })()}
 
                 <div className="flex gap-2">
                   {status === 'available' || status === 'in_progress' ? (

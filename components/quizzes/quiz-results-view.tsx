@@ -100,6 +100,29 @@ export function QuizResultsView({ quiz, attempt, onClose }: QuizResultsViewProps
     }
   }
 
+  // Helper function to get grade color based on percentage
+  const getGradeColor = (percentage: number) => {
+    if (percentage >= 80) {
+      return {
+        bg: 'bg-green-50',
+        text: 'text-green-600',
+        icon: 'text-green-500'
+      }
+    } else if (percentage >= 60) {
+      return {
+        bg: 'bg-orange-50',
+        text: 'text-orange-600',
+        icon: 'text-orange-500'
+      }
+    } else {
+      return {
+        bg: 'bg-red-50',
+        text: 'text-red-600',
+        icon: 'text-red-500'
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -109,12 +132,15 @@ export function QuizResultsView({ quiz, attempt, onClose }: QuizResultsViewProps
     )
   }
 
+  const percentage = getTotalPoints() > 0 ? Math.round((getTotalPointsEarned() / getTotalPoints()) * 100) : 0
+  const gradeColors = getGradeColor(percentage)
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <Card>
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <CheckCircle className="h-16 w-16 text-green-500" />
+            <CheckCircle className={`h-16 w-16 ${gradeColors.icon}`} />
           </div>
           <CardTitle className="text-2xl">Quiz Results</CardTitle>
           <p className="text-gray-600">Here are your detailed results and feedback:</p>
@@ -144,9 +170,9 @@ export function QuizResultsView({ quiz, attempt, onClose }: QuizResultsViewProps
               <p className="text-2xl font-bold text-green-600">{getTotalPoints()}</p>
               <p className="text-sm text-gray-600">Total Points</p>
             </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <p className="text-2xl font-bold text-purple-600">
-                {getTotalPoints() > 0 ? Math.round((getTotalPointsEarned() / getTotalPoints()) * 100) : 0}%
+            <div className={`text-center p-4 ${gradeColors.bg} rounded-lg`}>
+              <p className={`text-2xl font-bold ${gradeColors.text}`}>
+                {percentage}%
               </p>
               <p className="text-sm text-gray-600">Percentage</p>
             </div>

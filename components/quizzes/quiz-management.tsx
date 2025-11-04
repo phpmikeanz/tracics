@@ -2177,9 +2177,14 @@ export function QuizManagement() {
                           {(() => {
                             const completedAttempts = selectedQuizAttempts.filter(a => a.status === 'completed' || a.status === 'graded')
                             const scoredAttempts = selectedQuizAttempts.filter(a => a.score !== null)
+                            const totalPoints = getTotalPoints(selectedQuizQuestions)
                             
-                            if (scoredAttempts.length > 0) {
-                              return Math.round(scoredAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / scoredAttempts.length) + '%'
+                            if (scoredAttempts.length > 0 && totalPoints > 0) {
+                              const avgPercentage = scoredAttempts.reduce((sum, a) => {
+                                const percentage = ((a.score || 0) / totalPoints) * 100
+                                return sum + percentage
+                              }, 0) / scoredAttempts.length
+                              return Math.round(avgPercentage) + '%'
                             } else if (completedAttempts.length > 0) {
                               return 'Pending Grading'
                             } else {
@@ -2242,9 +2247,29 @@ export function QuizManagement() {
                     <div className="space-y-2">
                       {(() => {
                         const scoredAttempts = selectedQuizAttempts.filter(a => a.score !== null)
-                        const highScores = scoredAttempts.filter(a => (a.score || 0) >= 80).length
-                        const mediumScores = scoredAttempts.filter(a => (a.score || 0) >= 60 && (a.score || 0) < 80).length
-                        const lowScores = scoredAttempts.filter(a => (a.score || 0) < 60).length
+                        const totalPoints = getTotalPoints(selectedQuizQuestions)
+                        
+                        // Calculate percentages for each attempt and categorize
+                        const highScores = totalPoints > 0 
+                          ? scoredAttempts.filter(a => {
+                              const percentage = ((a.score || 0) / totalPoints) * 100
+                              return percentage >= 80
+                            }).length
+                          : 0
+                        
+                        const mediumScores = totalPoints > 0
+                          ? scoredAttempts.filter(a => {
+                              const percentage = ((a.score || 0) / totalPoints) * 100
+                              return percentage >= 60 && percentage < 80
+                            }).length
+                          : 0
+                        
+                        const lowScores = totalPoints > 0
+                          ? scoredAttempts.filter(a => {
+                              const percentage = ((a.score || 0) / totalPoints) * 100
+                              return percentage < 60
+                            }).length
+                          : 0
                         
                         return (
                           <>

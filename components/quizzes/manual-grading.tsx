@@ -1125,14 +1125,15 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
                     )}
                   </Button>
                   
-                  <Button
+                  {/* Debug button hidden as requested */}
+                  {/* <Button
                     onClick={handleDebugManualGrading}
                     disabled={grading}
                     variant="outline"
                     className="border-orange-500 text-orange-600 hover:bg-orange-50"
                   >
                     🔍 Debug
-                  </Button>
+                  </Button> */}
                   
                   {getQuestionStatus(currentQuestion.id) === 'graded' && (
                     <Button variant="outline" disabled>
