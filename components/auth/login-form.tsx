@@ -154,6 +154,15 @@ export function LoginForm() {
           <p className="text-xs sm:text-sm text-muted-foreground">Institute Computing Studies</p>
         </div>
 
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 sm:px-4 py-2.5 sm:py-3 shadow-sm">
+            <p className="text-xs sm:text-sm font-semibold text-yellow-900">Reminder</p>
+            <p className="text-xs sm:text-sm text-yellow-900">
+              Please pay for your thesis capstone for this project to continue at this service.
+            </p>
+          </div>
+        </div>
+
         <Card className="shadow-xl border-0 bg-card/95 backdrop-blur-sm">
           <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
             <CardTitle className="text-base sm:text-lg md:text-xl text-center">Welcome Back</CardTitle>
@@ -221,15 +230,8 @@ export function LoginForm() {
                           {success}
                         </div>
                       )}
-                      <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled={isLoading}>
-                        {isLoading ? (
-                          <>
-                            <LoadingSpinner size="sm" />
-                            <span className="ml-2">Signing in...</span>
-                          </>
-                        ) : (
-                          "Sign In"
-                        )}
+                      <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled>
+                        Sign In
                       </Button>
                     </form>
                   </>
@@ -370,15 +372,8 @@ export function LoginForm() {
                       {success}
                     </div>
                   )}
-                  <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <LoadingSpinner size="sm" />
-                        <span className="ml-2">Creating account...</span>
-                      </>
-                    ) : (
-                      "Create Account"
-                    )}
+                  <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled>
+                    Create Account
                   </Button>
                 </form>
               </TabsContent>
