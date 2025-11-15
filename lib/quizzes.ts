@@ -594,27 +594,50 @@ export async function saveQuizAnswers(
       return false
     }
     
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('quiz_attempts')
       .update({ 
         answers: answers,
         updated_at: new Date().toISOString()
       })
       .eq('id', attemptId)
+      .select('answers')
+      .single()
 
     if (error) {
-      console.error('Error auto-saving quiz answers:', error)
+      console.error('❌ Error auto-saving quiz answers:', error)
       console.error('Error details:', {
         message: error.message,
         details: error.details,
         hint: error.hint,
         code: error.code
       })
+      
+      // Check if it's an RLS policy error
+      if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
+        console.error('🚨 RLS POLICY ERROR: Student may not have permission to update quiz_attempts!')
+        console.error('This is a database permission issue. Check RLS policies on quiz_attempts table.')
+      }
+      
       return false
     }
 
-    console.log('Quiz answers auto-saved successfully for attempt:', attemptId)
-    return true
+    // Verify the update worked
+    if (data?.answers) {
+      const savedCount = Object.keys(data.answers).length
+      const expectedCount = Object.keys(answers).length
+      console.log('✅ Quiz answers auto-saved successfully for attempt:', attemptId)
+      console.log('✅ Saved', savedCount, 'answers (expected', expectedCount, ')')
+      
+      if (savedCount < expectedCount) {
+        console.warn('⚠️ Warning: Saved fewer answers than expected!')
+      }
+      
+      return true
+    } else {
+      console.error('❌ Save appeared successful but no data returned!')
+      return false
+    }
   } catch (error) {
     console.error('Error in saveQuizAnswers:', error)
     return false

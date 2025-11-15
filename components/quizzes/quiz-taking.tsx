@@ -461,16 +461,28 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   }
 
   const handleAnswerChange = async (questionId: string, answer: string) => {
-    console.log('🎯 handleAnswerChange called:', { questionId, answer })
+    console.log('🎯 handleAnswerChange called:', { questionId, answer, attemptId: attempt.id })
+    
+    // Validate inputs
+    if (!questionId || !answer) {
+      console.error('❌ Invalid handleAnswerChange call:', { questionId, answer })
+      return
+    }
+    
+    if (!attempt?.id) {
+      console.error('❌ No attempt ID available!')
+      return
+    }
     
     // Use functional update to ensure we get the latest state
+    let newAnswers: Record<string, string> = {}
     setQuizState((prev) => {
-      const newAnswers = { ...prev.answers, [questionId]: answer }
-      console.log('📝 Updating state with new answers:', newAnswers)
+      newAnswers = { ...prev.answers, [questionId]: answer }
+      console.log('📝 Updating state with new answers:', newAnswers, 'Count:', Object.keys(newAnswers).length)
       
       // CRITICAL: Update ref immediately and synchronously
       answersRef.current = newAnswers
-      console.log('✅ Ref updated immediately with:', answersRef.current)
+      console.log('✅ Ref updated immediately with:', answersRef.current, 'Count:', Object.keys(answersRef.current).length)
       
       return {
         ...prev,
@@ -479,21 +491,48 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       }
     })
 
-    // Get the updated answers for saving
-    const updatedAnswers = { ...answersRef.current }
-    console.log('💾 Saving answers to database:', updatedAnswers)
+    // Use the newAnswers directly (from state update)
+    console.log('💾 Saving answers to database:', newAnswers, 'Count:', Object.keys(newAnswers).length)
 
     // Auto-save the answer immediately with retry logic
     let saveSuccess = false
     let retryCount = 0
-    const maxRetries = 3 // Increased retries
+    const maxRetries = 5 // Increased retries
     
     while (!saveSuccess && retryCount < maxRetries) {
       try {
-        const saveResult = await saveQuizAnswers(attempt.id, updatedAnswers)
+        console.log(`💾 Attempting to save (attempt ${retryCount + 1}/${maxRetries})...`)
+        const saveResult = await saveQuizAnswers(attempt.id, newAnswers)
         if (saveResult) {
           saveSuccess = true
-          console.log('✅ Answer auto-saved for question:', questionId, 'on attempt:', retryCount + 1, 'Total answers saved:', Object.keys(updatedAnswers).length)
+          console.log('✅ Answer auto-saved for question:', questionId, 'on attempt:', retryCount + 1, 'Total answers saved:', Object.keys(newAnswers).length)
+          
+          // Verify the save by reading back
+          try {
+            const { data: verifyData, error: verifyError } = await supabase
+              .from('quiz_attempts')
+              .select('answers')
+              .eq('id', attempt.id)
+              .single()
+            
+            if (!verifyError && verifyData?.answers) {
+              const savedCount = Object.keys(verifyData.answers).length
+              const hasThisAnswer = verifyData.answers[questionId] === answer
+              console.log('✅ Save verified: Database has', savedCount, 'answers. This answer saved:', hasThisAnswer)
+              
+              if (!hasThisAnswer) {
+                console.warn('⚠️ Answer not found in database after save! Retrying...')
+                saveSuccess = false
+                retryCount++
+                await new Promise(resolve => setTimeout(resolve, 500))
+                continue
+              }
+            } else {
+              console.warn('⚠️ Could not verify save:', verifyError)
+            }
+          } catch (verifyError) {
+            console.warn('⚠️ Verification error (non-critical):', verifyError)
+          }
         } else {
           throw new Error('Save returned false')
         }
@@ -501,15 +540,21 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         retryCount++
         console.error(`❌ Failed to auto-save answer for question ${questionId} on attempt ${retryCount}:`, error)
         if (retryCount < maxRetries) {
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 300))
+          // Wait progressively longer before retrying
+          await new Promise(resolve => setTimeout(resolve, 300 * retryCount))
         }
       }
     }
     
     if (!saveSuccess) {
-      console.error('❌ Failed to auto-save answer after all retries for question:', questionId)
-      // Don't show error to user as it might be distracting, but log it
+      console.error('❌ CRITICAL: Failed to auto-save answer after all retries for question:', questionId)
+      console.error('This answer may be lost! Answer was:', answer)
+      // Show error to user since this is critical
+      toast({
+        title: "⚠️ Save Failed",
+        description: `Failed to save answer for question. Please try clicking again or contact your instructor.`,
+        variant: "destructive",
+      })
     }
     
     setQuizState((prev) => ({
@@ -953,14 +998,45 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         // Continue with state answers only
       }
       
-      // Ensure we have answers - if not, log warning but proceed
+      // CRITICAL: If we still don't have answers, try one more database read
       if (!currentAnswers || Object.keys(currentAnswers).length === 0) {
-        console.warn('⚠️ WARNING: No answers found when auto-submitting!')
-        toast({
-          title: "⚠️ Warning",
-          description: "No answers were found to submit. Please contact your instructor.",
-          variant: "destructive",
-        })
+        console.warn('⚠️ WARNING: No answers found after DOM capture! Trying final database read...')
+        
+        try {
+          const { data: finalDbRead, error: finalDbError } = await supabase
+            .from('quiz_attempts')
+            .select('answers')
+            .eq('id', attempt.id)
+            .single()
+          
+          if (!finalDbError && finalDbRead?.answers && Object.keys(finalDbRead.answers).length > 0) {
+            currentAnswers = finalDbRead.answers as Record<string, string>
+            console.log('✅ FINAL RESCUE: Found answers in database:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+          } else {
+            console.error('❌ CRITICAL: No answers found in database either!', finalDbError)
+            console.error('Database read result:', finalDbRead)
+            
+            // Last resort: Check if answers were ever saved
+            console.log('🔍 Checking if answers were saved during quiz...')
+            console.log('State answers history:', quizState.answers)
+            console.log('Ref answers:', answersRef.current)
+            
+            toast({
+              title: "⚠️ Critical Warning",
+              description: "No answers were found. Your answers may not have been saved. Please contact your instructor immediately.",
+              variant: "destructive",
+            })
+          }
+        } catch (finalReadError) {
+          console.error('❌ Error in final database read:', finalReadError)
+        }
+      }
+      
+      // Final check before proceeding
+      if (!currentAnswers || Object.keys(currentAnswers).length === 0) {
+        console.error('❌ CRITICAL ERROR: Cannot proceed with submission - no answers found anywhere!')
+        console.error('This should not happen. Answers should have been saved when clicked.')
+        return // Don't submit with empty answers
       } else {
         console.log('✅ Final answers to submit:', currentAnswers, 'Total:', Object.keys(currentAnswers).length)
       }
