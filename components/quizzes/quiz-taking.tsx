@@ -411,36 +411,54 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   }
 
   const handleAnswerChange = async (questionId: string, answer: string) => {
-    const newAnswers = { ...quizState.answers, [questionId]: answer }
+    console.log('🎯 handleAnswerChange called:', { questionId, answer })
     
-    setQuizState((prev) => ({
-      ...prev,
-      answers: newAnswers,
-      isAutoSaving: true
-    }))
+    // Use functional update to ensure we get the latest state
+    setQuizState((prev) => {
+      const newAnswers = { ...prev.answers, [questionId]: answer }
+      console.log('📝 Updating state with new answers:', newAnswers)
+      
+      // CRITICAL: Update ref immediately and synchronously
+      answersRef.current = newAnswers
+      console.log('✅ Ref updated immediately with:', answersRef.current)
+      
+      return {
+        ...prev,
+        answers: newAnswers,
+        isAutoSaving: true
+      }
+    })
+
+    // Get the updated answers for saving
+    const updatedAnswers = { ...answersRef.current }
+    console.log('💾 Saving answers to database:', updatedAnswers)
 
     // Auto-save the answer immediately with retry logic
     let saveSuccess = false
     let retryCount = 0
-    const maxRetries = 2
+    const maxRetries = 3 // Increased retries
     
     while (!saveSuccess && retryCount < maxRetries) {
       try {
-        await saveQuizAnswers(attempt.id, newAnswers)
-        saveSuccess = true
-        console.log('Answer auto-saved for question:', questionId, 'on attempt:', retryCount + 1)
+        const saveResult = await saveQuizAnswers(attempt.id, updatedAnswers)
+        if (saveResult) {
+          saveSuccess = true
+          console.log('✅ Answer auto-saved for question:', questionId, 'on attempt:', retryCount + 1, 'Total answers saved:', Object.keys(updatedAnswers).length)
+        } else {
+          throw new Error('Save returned false')
+        }
       } catch (error) {
         retryCount++
-        console.error(`Failed to auto-save answer for question ${questionId} on attempt ${retryCount}:`, error)
+        console.error(`❌ Failed to auto-save answer for question ${questionId} on attempt ${retryCount}:`, error)
         if (retryCount < maxRetries) {
           // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 200))
+          await new Promise(resolve => setTimeout(resolve, 300))
         }
       }
     }
     
     if (!saveSuccess) {
-      console.error('Failed to auto-save answer after all retries for question:', questionId)
+      console.error('❌ Failed to auto-save answer after all retries for question:', questionId)
       // Don't show error to user as it might be distracting, but log it
     }
     
@@ -666,18 +684,28 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       // Wait longer to ensure any pending state updates and DOM updates are complete
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      // Get the most current answers from state (use ref for latest value)
-      let currentAnswers = { ...answersRef.current }
-      console.log('📊 Initial answers from state (via ref):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      // CRITICAL: Get the most current answers - use functional update to get latest state
+      let currentAnswers: Record<string, string> = {}
       
-      // Also get from state as backup
       setQuizState((prev) => {
-        if (Object.keys(prev.answers).length > Object.keys(currentAnswers).length) {
-          currentAnswers = { ...prev.answers }
-          console.log('📊 Updated answers from state (more answers found):', currentAnswers)
-        }
-        return prev
+        // Get latest from state
+        currentAnswers = { ...prev.answers }
+        console.log('📊 Latest answers from state:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+        
+        // Also update ref to ensure it's in sync
+        answersRef.current = { ...prev.answers }
+        console.log('📊 Ref synchronized with state')
+        
+        return prev // Don't change state, just read it
       })
+      
+      // Also check ref as backup
+      if (Object.keys(answersRef.current).length > Object.keys(currentAnswers).length) {
+        currentAnswers = { ...answersRef.current }
+        console.log('📊 Using ref answers (more than state):', currentAnswers)
+      }
+      
+      console.log('📊 Final initial answers before DOM capture:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       
       // COMPREHENSIVE DOM CAPTURE - Capture ALL user input from ALL questions
       // This ensures we capture ANY input the user has entered, even if partially typed
@@ -784,10 +812,12 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         }
         
         // Merge answers intelligently:
-        // 1. Start with state answers (most reliable, already saved)
+        // 1. Start with state answers (most reliable, already saved via handleAnswerChange)
         // 2. Add DOM answers for missing questions (catches recent selections)
         // 3. For text inputs, prefer DOM if it has a value (might have latest typing)
         const mergedAnswers = { ...currentAnswers }
+        
+        console.log('🔄 Merging answers - State has:', Object.keys(currentAnswers).length, 'DOM has:', Object.keys(domAnswers).length)
         
         Object.keys(domAnswers).forEach((questionId) => {
           const domValue = domAnswers[questionId]
@@ -805,11 +835,22 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
             // For text inputs, prefer DOM if it has a value (might be more recent)
             mergedAnswers[questionId] = domValue
             console.log(`✅ Updated text answer from DOM for question ${questionId}`)
-          } else if (stateValue && !domValue) {
-            // State has it but DOM doesn't - keep state (radio button was selected earlier)
-            console.log(`✅ Keeping state answer for question ${questionId}:`, stateValue)
+          } else if (stateValue) {
+            // State has it - ALWAYS keep state for radio buttons (most reliable)
+            // Don't overwrite with DOM for radio buttons
+            console.log(`✅ Keeping state answer for question ${questionId} (${question?.type}):`, stateValue)
           }
         })
+        
+        // Final verification: Log all answers by question type
+        if (quizState.questions) {
+          quizState.questions.forEach((q) => {
+            if (q.type === 'multiple_choice' || q.type === 'true_false') {
+              const answer = mergedAnswers[q.id]
+              console.log(`📻 Radio question ${q.id} (${q.type}):`, answer || 'NO ANSWER')
+            }
+          })
+        }
         
         currentAnswers = mergedAnswers
         console.log('✅ Final answers after comprehensive DOM capture:', currentAnswers)
