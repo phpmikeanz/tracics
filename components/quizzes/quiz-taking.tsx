@@ -426,12 +426,58 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
 
   const handleSubmitQuiz = async () => {
     try {
+      // Wait a brief moment to ensure any pending state updates are complete
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Get the most current answers from state
+      let currentAnswers = { ...quizState.answers }
+      console.log('Initial answers from state (manual submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      
+      // Also try to capture answers directly from form inputs as a fallback
+      try {
+        // Capture radio button answers (multiple choice and true/false)
+        const radioInputs = document.querySelectorAll('input[type="radio"]:checked')
+        const textInputs = document.querySelectorAll('input[type="text"]')
+        const textareas = document.querySelectorAll('textarea')
+        const domAnswers: Record<string, string> = {}
+        
+        // Process radio buttons
+        radioInputs.forEach((input: any) => {
+          const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+          if (questionId && input.value) {
+            domAnswers[questionId] = input.value
+          }
+        })
+        
+        // Process text inputs and textareas
+        textInputs.forEach((input: any) => {
+          const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+          if (questionId && input.value && input.value.trim()) {
+            domAnswers[questionId] = input.value.trim()
+          }
+        })
+        
+        textareas.forEach((textarea: any) => {
+          const questionId = textarea.getAttribute('data-question-id') || textarea.name?.replace('question-', '')
+          if (questionId && textarea.value && textarea.value.trim()) {
+            domAnswers[questionId] = textarea.value.trim()
+          }
+        })
+        
+        // Merge DOM answers with state answers (DOM takes precedence for latest values)
+        currentAnswers = { ...currentAnswers, ...domAnswers }
+        console.log('✅ Answers after DOM capture (manual submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      } catch (domError) {
+        console.warn('⚠️ Error capturing answers from DOM (manual submit):', domError)
+        // Continue with state answers only
+      }
+      
       // Final save of all answers before submission
-      console.log('Final save before manual submission:', quizState.answers)
-      await saveQuizAnswers(attempt.id, quizState.answers)
+      console.log('Final save before manual submission:', currentAnswers)
+      await saveQuizAnswers(attempt.id, currentAnswers)
       
       // Submit the quiz - this will trigger database notifications automatically
-      await submitQuizAttempt(attempt.id, quizState.answers)
+      await submitQuizAttempt(attempt.id, currentAnswers)
       
       // Additional activity tracking (database triggers handle the main notifications)
       if (user?.id && quiz.course_id) {
@@ -456,7 +502,7 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       setQuizState((prev) => ({ ...prev, isSubmitted: true }))
       setShowSubmitDialog(false)
       
-      const answeredCount = Object.keys(quizState.answers).length
+      const answeredCount = Object.keys(currentAnswers).length
       toast({
         title: "Success",
         description: `Quiz submitted successfully! ${answeredCount} answers have been saved.`,
@@ -513,9 +559,65 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         variant: "destructive",
       })
 
+      // Wait a brief moment to ensure any pending state updates are complete
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Get the most current answers from state
-      const currentAnswers = { ...quizState.answers }
-      console.log('Final auto-save before submission:', currentAnswers)
+      let currentAnswers = { ...quizState.answers }
+      console.log('Initial answers from state:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      
+      // Also try to capture answers directly from form inputs as a fallback
+      // This ensures we don't lose answers that might be in the DOM but not yet in state
+      try {
+        // Capture radio button answers (multiple choice and true/false)
+        const radioInputs = document.querySelectorAll('input[type="radio"]:checked')
+        const textInputs = document.querySelectorAll('input[type="text"]')
+        const textareas = document.querySelectorAll('textarea')
+        const domAnswers: Record<string, string> = {}
+        
+        // Process radio buttons
+        radioInputs.forEach((input: any) => {
+          const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+          if (questionId && input.value) {
+            domAnswers[questionId] = input.value
+          }
+        })
+        
+        // Process text inputs and textareas
+        textInputs.forEach((input: any) => {
+          const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+          if (questionId && input.value && input.value.trim()) {
+            domAnswers[questionId] = input.value.trim()
+          }
+        })
+        
+        textareas.forEach((textarea: any) => {
+          const questionId = textarea.getAttribute('data-question-id') || textarea.name?.replace('question-', '')
+          if (questionId && textarea.value && textarea.value.trim()) {
+            domAnswers[questionId] = textarea.value.trim()
+          }
+        })
+        
+        // Merge DOM answers with state answers (DOM takes precedence for latest values)
+        currentAnswers = { ...currentAnswers, ...domAnswers }
+        console.log('✅ Answers after DOM capture:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+        console.log('📋 DOM answers found:', domAnswers)
+      } catch (domError) {
+        console.warn('⚠️ Error capturing answers from DOM:', domError)
+        // Continue with state answers only
+      }
+      
+      // Ensure we have answers - if not, log warning but proceed
+      if (!currentAnswers || Object.keys(currentAnswers).length === 0) {
+        console.warn('⚠️ WARNING: No answers found when auto-submitting!')
+        toast({
+          title: "⚠️ Warning",
+          description: "No answers were found to submit. Please contact your instructor.",
+          variant: "destructive",
+        })
+      } else {
+        console.log('✅ Final answers to submit:', currentAnswers, 'Total:', Object.keys(currentAnswers).length)
+      }
       
       // Ensure we have the latest answers by doing a final save with retry
       let saveSuccess = false
@@ -526,10 +628,10 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         try {
           await saveQuizAnswers(attempt.id, currentAnswers)
           saveSuccess = true
-          console.log('Final save successful on attempt:', retryCount + 1)
+          console.log('✅ Final save successful on attempt:', retryCount + 1, 'with', Object.keys(currentAnswers).length, 'answers')
         } catch (saveError) {
           retryCount++
-          console.error(`Final save failed on attempt ${retryCount}:`, saveError)
+          console.error(`❌ Final save failed on attempt ${retryCount}:`, saveError)
           if (retryCount < maxRetries) {
             // Wait a bit before retrying
             await new Promise(resolve => setTimeout(resolve, 500))
@@ -538,11 +640,11 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       }
       
       if (!saveSuccess) {
-        console.warn('Final save failed after all retries, proceeding with submission anyway')
+        console.warn('⚠️ Final save failed after all retries, proceeding with submission anyway')
       }
       
       // Submit the quiz with all current answers
-      console.log('Submitting quiz with answers:', currentAnswers)
+      console.log('📤 Submitting quiz with answers:', currentAnswers, 'Answer count:', Object.keys(currentAnswers).length)
       await submitQuizAttempt(attempt.id, currentAnswers)
       
       // Note: Notifications are now handled automatically by database triggers
@@ -1172,7 +1274,12 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
                     <div className="space-y-3">
                       {currentQuestion.options.map((option, index) => (
                         <div key={index} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                          <RadioGroupItem value={option} id={`option-${index}`} />
+                          <RadioGroupItem 
+                            value={option} 
+                            id={`option-${index}`}
+                            data-question-id={currentQuestion.id}
+                            name={`question-${currentQuestion.id}`}
+                          />
                           <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
                             <span className="font-medium mr-2">{String.fromCharCode(65 + index)}.</span>
                             {option}
@@ -1191,13 +1298,23 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
                   >
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                        <RadioGroupItem value="true" id="true" />
+                        <RadioGroupItem 
+                          value="true" 
+                          id="true"
+                          data-question-id={currentQuestion.id}
+                          name={`question-${currentQuestion.id}`}
+                        />
                         <Label htmlFor="true" className="flex-1 cursor-pointer">
                           True
                         </Label>
                       </div>
                       <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                        <RadioGroupItem value="false" id="false" />
+                        <RadioGroupItem 
+                          value="false" 
+                          id="false"
+                          data-question-id={currentQuestion.id}
+                          name={`question-${currentQuestion.id}`}
+                        />
                         <Label htmlFor="false" className="flex-1 cursor-pointer">
                           False
                         </Label>
@@ -1214,6 +1331,8 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
                     rows={currentQuestion.type === "essay" ? 8 : 3}
                     className="w-full"
                     disabled={quizState.isAutoSubmitting}
+                    data-question-id={currentQuestion.id}
+                    name={`question-${currentQuestion.id}`}
                   />
                 )}
               </div>
