@@ -47,9 +47,59 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const { toast } = useToast()
   const supabase = createClient()
   
-  // Set quiz ID in window for debugging
+  // Set quiz ID and attempt ID in window for debugging
   if (typeof window !== 'undefined') {
     (window as any).currentQuizId = quiz.id
+    ;(window as any).currentAttemptId = attempt.id
+    ;(window as any).debugQuizAnswers = async () => {
+      console.log('🔍 DEBUGGING QUIZ ANSWERS')
+      console.log('Attempt ID:', attempt.id)
+      console.log('Quiz ID:', quiz.id)
+      console.log('Current State Answers:', quizState.answers)
+      console.log('Ref Answers:', answersRef.current)
+      
+      // Read from database
+      try {
+        const { data: dbData, error: dbError } = await supabase
+          .from('quiz_attempts')
+          .select('answers, score, status')
+          .eq('id', attempt.id)
+          .single()
+        
+        console.log('Database Answers:', dbData?.answers)
+        console.log('Database Score:', dbData?.score)
+        console.log('Database Status:', dbData?.status)
+        console.log('Database Error:', dbError)
+        
+        // Check DOM
+        const allRadios = document.querySelectorAll('input[type="radio"]:checked')
+        console.log('Checked Radio Buttons in DOM:', allRadios.length)
+        allRadios.forEach((radio: any, index) => {
+          console.log(`Radio ${index}:`, {
+            questionId: radio.getAttribute('data-question-id') || radio.name,
+            value: radio.value,
+            checked: radio.checked
+          })
+        })
+        
+        // Check questions
+        if (quizState.questions) {
+          console.log('Questions:', quizState.questions.length)
+          quizState.questions.forEach((q) => {
+            const stateAnswer = quizState.answers[q.id]
+            const refAnswer = answersRef.current[q.id]
+            const dbAnswer = dbData?.answers?.[q.id]
+            console.log(`Question ${q.id} (${q.type}):`, {
+              state: stateAnswer || 'NO ANSWER',
+              ref: refAnswer || 'NO ANSWER',
+              db: dbAnswer || 'NO ANSWER'
+            })
+          })
+        }
+      } catch (error) {
+        console.error('Debug error:', error)
+      }
+    }
   }
 
   // Safe shuffle function with seed for consistent randomization per student

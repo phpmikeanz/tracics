@@ -697,9 +697,33 @@ export async function submitQuizAttempt(
     finalStatus = 'completed'
   }
     
+    // CRITICAL: Ensure answers are always included and not empty
+    // If answers is empty or null, try to read from database first
+    let finalAnswers = answers || {}
+    
+    if (!answers || Object.keys(answers).length === 0) {
+      console.warn('⚠️ WARNING: submitQuizAttempt called with empty answers! Reading from database...')
+      try {
+        const { data: attemptData } = await supabase
+          .from('quiz_attempts')
+          .select('answers')
+          .eq('id', attemptId)
+          .single()
+        
+        if (attemptData?.answers && Object.keys(attemptData.answers).length > 0) {
+          finalAnswers = attemptData.answers as Record<string, any>
+          console.log('✅ Retrieved answers from database:', finalAnswers, 'Count:', Object.keys(finalAnswers).length)
+        } else {
+          console.error('❌ No answers found in database either!')
+        }
+      } catch (readError) {
+        console.error('❌ Error reading answers from database:', readError)
+      }
+    }
+    
     // Ensure answers are always included, even if empty
     const updateData: any = {
-      answers: answers || {},
+      answers: finalAnswers,
       status: finalStatus,
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
