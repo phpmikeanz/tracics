@@ -135,6 +135,14 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const [showResults, setShowResults] = useState(false)
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set())
   const [manualGrades, setManualGrades] = useState<Database["public"]["Tables"]["quiz_question_grades"]["Row"][]>([])
+  
+  // Ref to store latest answers for timer access without causing re-renders
+  const answersRef = useRef<Record<string, string>>(quizState.answers)
+  
+  // Update ref whenever answers change
+  useEffect(() => {
+    answersRef.current = quizState.answers
+  }, [quizState.answers])
 
 
 
@@ -310,20 +318,66 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   useEffect(() => {
     // Don't run timer if submitted, auto-submitting, or submission was already attempted
     if (!quizState.isSubmitted && !quizState.isAutoSubmitting && !quizState.submissionAttempted) {
+      let finalSaveDone = false // Flag to prevent multiple final saves
+      
       const timer = setInterval(() => {
         const remaining = calculateTimeRemaining()
         setQuizState((prev) => ({ ...prev, timeRemaining: remaining }))
         
+        // Final save when timer is about to expire (5 seconds before) - only once
+        if (remaining === 5 && !finalSaveDone && !quizState.isSubmitted && !quizState.isAutoSubmitting) {
+          finalSaveDone = true
+          console.log('⏰ 5 seconds remaining - performing final save of all answers')
+          
+          // Capture all answers from DOM and save them
+          const domAnswers: Record<string, string> = {}
+          
+          // Capture all inputs
+          document.querySelectorAll('input[type="radio"]').forEach((input: any) => {
+            if (input.checked) {
+              const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+              if (questionId && input.value) {
+                domAnswers[questionId] = input.value
+              }
+            }
+          })
+          
+          document.querySelectorAll('input[type="text"]').forEach((input: any) => {
+            const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+            if (questionId && input.value) {
+              domAnswers[questionId] = input.value
+            }
+          })
+          
+          document.querySelectorAll('textarea').forEach((textarea: any) => {
+            const questionId = textarea.getAttribute('data-question-id') || textarea.name?.replace('question-', '')
+            if (questionId && textarea.value) {
+              domAnswers[questionId] = textarea.value
+            }
+          })
+          
+          // Get current state answers from ref (latest without re-render)
+          const stateAnswers = answersRef.current
+          const finalAnswers = { ...stateAnswers, ...domAnswers }
+          
+          // Save immediately
+          saveQuizAnswers(attempt.id, finalAnswers).then(() => {
+            console.log('✅ Final save completed with', Object.keys(finalAnswers).length, 'answers')
+          }).catch((error) => {
+            console.error('❌ Final save failed:', error)
+          })
+        }
+        
         // Auto-submit when time runs out
         if (remaining === 0 && !quizState.isSubmitted && !quizState.isAutoSubmitting && !quizState.submissionAttempted) {
-          console.log('Time expired, triggering auto-submit')
+          console.log('⏰ Time expired, triggering auto-submit')
           handleAutoSubmitQuiz()
         }
       }, 1000)
       
       return () => clearInterval(timer)
     }
-  }, [quizState.isSubmitted, quizState.isAutoSubmitting, quizState.submissionAttempted]) // Added submissionAttempted
+  }, [quizState.isSubmitted, quizState.isAutoSubmitting, quizState.submissionAttempted, attempt.id])
 
   // Warning effects for low time
   useEffect(() => {
@@ -427,44 +481,68 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const handleSubmitQuiz = async () => {
     try {
       // Wait a brief moment to ensure any pending state updates are complete
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 200))
 
       // Get the most current answers from state
       let currentAnswers = { ...quizState.answers }
-      console.log('Initial answers from state (manual submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      console.log('📊 Initial answers from state (manual submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       
-      // Also try to capture answers directly from form inputs as a fallback
+      // COMPREHENSIVE DOM CAPTURE - Capture ALL user input from ALL questions
       try {
-        // Capture radio button answers (multiple choice and true/false)
-        const radioInputs = document.querySelectorAll('input[type="radio"]:checked')
-        const textInputs = document.querySelectorAll('input[type="text"]')
-        const textareas = document.querySelectorAll('textarea')
         const domAnswers: Record<string, string> = {}
         
-        // Process radio buttons
-        radioInputs.forEach((input: any) => {
+        // Capture ALL radio buttons (checked ones)
+        const allRadioInputs = document.querySelectorAll('input[type="radio"]')
+        allRadioInputs.forEach((input: any) => {
+          if (input.checked) {
+            const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+            if (questionId && input.value) {
+              domAnswers[questionId] = input.value
+            }
+          }
+        })
+        
+        // Capture ALL text inputs (even partial input)
+        const allTextInputs = document.querySelectorAll('input[type="text"]')
+        allTextInputs.forEach((input: any) => {
           const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
           if (questionId && input.value) {
             domAnswers[questionId] = input.value
           }
         })
         
-        // Process text inputs and textareas
-        textInputs.forEach((input: any) => {
-          const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
-          if (questionId && input.value && input.value.trim()) {
-            domAnswers[questionId] = input.value.trim()
-          }
-        })
-        
-        textareas.forEach((textarea: any) => {
+        // Capture ALL textareas (even partial input)
+        const allTextareas = document.querySelectorAll('textarea')
+        allTextareas.forEach((textarea: any) => {
           const questionId = textarea.getAttribute('data-question-id') || textarea.name?.replace('question-', '')
-          if (questionId && textarea.value && textarea.value.trim()) {
-            domAnswers[questionId] = textarea.value.trim()
+          if (questionId && textarea.value) {
+            domAnswers[questionId] = textarea.value
           }
         })
         
-        // Merge DOM answers with state answers (DOM takes precedence for latest values)
+        // Iterate through ALL questions to ensure we don't miss any
+        if (quizState.questions && quizState.questions.length > 0) {
+          quizState.questions.forEach((question) => {
+            if (!domAnswers[question.id] && !currentAnswers[question.id]) {
+              const questionRadio = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`)
+              if (questionRadio) {
+                domAnswers[question.id] = (questionRadio as HTMLInputElement).value
+              }
+              
+              const questionTextarea = document.querySelector(`textarea[data-question-id="${question.id}"]`)
+              if (questionTextarea && (questionTextarea as HTMLTextAreaElement).value) {
+                domAnswers[question.id] = (questionTextarea as HTMLTextAreaElement).value
+              }
+              
+              const questionTextInput = document.querySelector(`input[type="text"][data-question-id="${question.id}"]`)
+              if (questionTextInput && (questionTextInput as HTMLInputElement).value) {
+                domAnswers[question.id] = (questionTextInput as HTMLInputElement).value
+              }
+            }
+          })
+        }
+        
+        // Merge DOM answers with state answers (DOM takes precedence)
         currentAnswers = { ...currentAnswers, ...domAnswers }
         console.log('✅ Answers after DOM capture (manual submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       } catch (domError) {
@@ -560,50 +638,101 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       })
 
       // Wait a brief moment to ensure any pending state updates are complete
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 200))
 
       // Get the most current answers from state
       let currentAnswers = { ...quizState.answers }
-      console.log('Initial answers from state:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      console.log('📊 Initial answers from state:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       
-      // Also try to capture answers directly from form inputs as a fallback
-      // This ensures we don't lose answers that might be in the DOM but not yet in state
+      // COMPREHENSIVE DOM CAPTURE - Capture ALL user input from ALL questions
+      // This ensures we capture ANY input the user has entered, even if partially typed
       try {
-        // Capture radio button answers (multiple choice and true/false)
-        const radioInputs = document.querySelectorAll('input[type="radio"]:checked')
-        const textInputs = document.querySelectorAll('input[type="text"]')
-        const textareas = document.querySelectorAll('textarea')
         const domAnswers: Record<string, string> = {}
         
-        // Process radio buttons
-        radioInputs.forEach((input: any) => {
+        // Method 1: Capture by data-question-id attributes
+        // Capture ALL radio buttons (checked and unchecked to find the checked one)
+        const allRadioInputs = document.querySelectorAll('input[type="radio"]')
+        allRadioInputs.forEach((input: any) => {
+          if (input.checked) {
+            const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
+            if (questionId && input.value) {
+              domAnswers[questionId] = input.value
+              console.log(`📻 Radio answer captured for question ${questionId}:`, input.value)
+            }
+          }
+        })
+        
+        // Capture ALL text inputs (even if empty - we'll filter later)
+        const allTextInputs = document.querySelectorAll('input[type="text"]')
+        allTextInputs.forEach((input: any) => {
           const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
           if (questionId && input.value) {
+            // Capture even partial input - don't trim, save as-is
             domAnswers[questionId] = input.value
+            console.log(`📝 Text answer captured for question ${questionId}:`, input.value)
           }
         })
         
-        // Process text inputs and textareas
-        textInputs.forEach((input: any) => {
-          const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
-          if (questionId && input.value && input.value.trim()) {
-            domAnswers[questionId] = input.value.trim()
-          }
-        })
-        
-        textareas.forEach((textarea: any) => {
+        // Capture ALL textareas (even if partially typed)
+        const allTextareas = document.querySelectorAll('textarea')
+        allTextareas.forEach((textarea: any) => {
           const questionId = textarea.getAttribute('data-question-id') || textarea.name?.replace('question-', '')
-          if (questionId && textarea.value && textarea.value.trim()) {
-            domAnswers[questionId] = textarea.value.trim()
+          if (questionId && textarea.value) {
+            // Capture even partial input - save as-is
+            domAnswers[questionId] = textarea.value
+            console.log(`📄 Textarea answer captured for question ${questionId}:`, textarea.value.substring(0, 50) + '...')
           }
         })
+        
+        // Method 2: Iterate through ALL questions and try to find their inputs
+        // This is a fallback to ensure we don't miss anything
+        if (quizState.questions && quizState.questions.length > 0) {
+          quizState.questions.forEach((question) => {
+            // If we don't have an answer for this question yet, try to find it
+            if (!domAnswers[question.id] && !currentAnswers[question.id]) {
+              // Try to find radio button for this question
+              const questionRadio = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`)
+              if (questionRadio) {
+                domAnswers[question.id] = (questionRadio as HTMLInputElement).value
+                console.log(`🔍 Found radio answer for question ${question.id} via search:`, (questionRadio as HTMLInputElement).value)
+              }
+              
+              // Try to find textarea for this question
+              const questionTextarea = document.querySelector(`textarea[data-question-id="${question.id}"]`)
+              if (questionTextarea && (questionTextarea as HTMLTextAreaElement).value) {
+                domAnswers[question.id] = (questionTextarea as HTMLTextAreaElement).value
+                console.log(`🔍 Found textarea answer for question ${question.id} via search`)
+              }
+              
+              // Try to find text input for this question
+              const questionTextInput = document.querySelector(`input[type="text"][data-question-id="${question.id}"]`)
+              if (questionTextInput && (questionTextInput as HTMLInputElement).value) {
+                domAnswers[question.id] = (questionTextInput as HTMLInputElement).value
+                console.log(`🔍 Found text input answer for question ${question.id} via search`)
+              }
+            }
+          })
+        }
         
         // Merge DOM answers with state answers (DOM takes precedence for latest values)
+        // This ensures we capture the most recent input
         currentAnswers = { ...currentAnswers, ...domAnswers }
-        console.log('✅ Answers after DOM capture:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+        console.log('✅ Final answers after comprehensive DOM capture:', currentAnswers)
+        console.log('📊 Total answers captured:', Object.keys(currentAnswers).length, 'out of', quizState.questions?.length || 0, 'questions')
         console.log('📋 DOM answers found:', domAnswers)
+        
+        // Log which questions have answers and which don't
+        if (quizState.questions) {
+          quizState.questions.forEach((q) => {
+            if (currentAnswers[q.id]) {
+              console.log(`✅ Question ${q.id} has answer:`, currentAnswers[q.id].substring(0, 50))
+            } else {
+              console.log(`❌ Question ${q.id} has NO answer`)
+            }
+          })
+        }
       } catch (domError) {
-        console.warn('⚠️ Error capturing answers from DOM:', domError)
+        console.error('⚠️ Error capturing answers from DOM:', domError)
         // Continue with state answers only
       }
       
