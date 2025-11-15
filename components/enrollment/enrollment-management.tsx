@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
-import { CheckCircle, XCircle, Clock, Search, UserMinus, Users, Loader2, Eye } from "lucide-react"
+import { CheckCircle, XCircle, Clock, Search, UserMinus, Users, Loader2, Eye, BookOpen, FileText, Award, Mail, Calendar } from "lucide-react"
 import { getCoursesByInstructor } from "@/lib/courses"
 import { getEnrollmentsByCourse, updateEnrollmentStatus, getEnrollmentsForInstructor } from "@/lib/enrollments"
+import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/types"
 
 type EnrollmentWithDetails = Database["public"]["Tables"]["enrollments"]["Row"] & {
@@ -26,6 +28,12 @@ export function EnrollmentManagement() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentWithDetails[]>([])
+  const [selectedEnrollment, setSelectedEnrollment] = useState<EnrollmentWithDetails | null>(null)
+  const [studentPerformance, setStudentPerformance] = useState<{
+    assignments: any[]
+    quizzes: any[]
+    loading: boolean
+  }>({ assignments: [], quizzes: [], loading: false })
 
   // Load enrollment requests for instructor's courses
   useEffect(() => {
@@ -163,6 +171,53 @@ export function EnrollmentManagement() {
     })
   }
 
+  const loadStudentPerformance = async (studentId: string, courseId: string) => {
+    if (!studentId || !courseId) return
+    
+    try {
+      setStudentPerformance({ assignments: [], quizzes: [], loading: true })
+      const supabase = createClient()
+
+      // Get assignment submissions for this student in this course
+      const { data: submissions } = await supabase
+        .from("assignment_submissions")
+        .select(`
+          *,
+          assignments!inner(title, due_date, course_id, max_points)
+        `)
+        .eq("student_id", studentId)
+        .eq("assignments.course_id", courseId)
+        .order("submitted_at", { ascending: false })
+
+      // Get quiz attempts for this student in this course
+      const { data: quizAttempts } = await supabase
+        .from("quiz_attempts")
+        .select(`
+          *,
+          quizzes!inner(title, course_id, max_score)
+        `)
+        .eq("student_id", studentId)
+        .eq("quizzes.course_id", courseId)
+        .order("completed_at", { ascending: false })
+
+      setStudentPerformance({
+        assignments: submissions || [],
+        quizzes: quizAttempts || [],
+        loading: false
+      })
+    } catch (error) {
+      console.error("Error loading student performance:", error)
+      setStudentPerformance({ assignments: [], quizzes: [], loading: false })
+    }
+  }
+
+  const handleViewStudent = (enrollment: EnrollmentWithDetails) => {
+    setSelectedEnrollment(enrollment)
+    if (enrollment.student_id && enrollment.course_id) {
+      loadStudentPerformance(enrollment.student_id, enrollment.course_id)
+    }
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -226,11 +281,7 @@ export function EnrollmentManagement() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                // Navigate to student profile or details
-                console.log('View student details:', enrollment.profiles?.full_name)
-                // You can add navigation logic here
-              }}
+              onClick={() => handleViewStudent(enrollment)}
               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
             >
               <Eye className="h-4 w-4 mr-1" />
@@ -400,6 +451,205 @@ export function EnrollmentManagement() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Student Details Dialog */}
+      <Dialog open={!!selectedEnrollment} onOpenChange={(open) => !open && setSelectedEnrollment(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage 
+                  src={selectedEnrollment?.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedEnrollment?.profiles?.full_name || 'Student')}&background=random&color=fff&size=128`} 
+                  alt={selectedEnrollment?.profiles?.full_name || "Student"}
+                />
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  {selectedEnrollment?.profiles?.full_name?.charAt(0) || "S"}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="text-xl font-bold">{selectedEnrollment?.profiles?.full_name || "Unknown Student"}</div>
+                <div className="text-sm text-muted-foreground font-normal">
+                  {selectedEnrollment?.courses?.title} ({selectedEnrollment?.courses?.course_code})
+                </div>
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              View student profile and performance details
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEnrollment && (
+            <div className="space-y-6 mt-4">
+              {/* Student Information */}
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <UserMinus className="h-4 w-4" />
+                    Student Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Full Name</p>
+                      <p className="font-medium">{selectedEnrollment.profiles?.full_name || "N/A"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        Email
+                      </p>
+                      <p className="font-medium">{selectedEnrollment.profiles?.email || "N/A"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Student ID</p>
+                      <p className="font-medium">{selectedEnrollment.student_id || "N/A"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Enrollment Status</p>
+                      <Badge
+                        variant={
+                          selectedEnrollment.status === "approved"
+                            ? "default"
+                            : selectedEnrollment.status === "declined"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {selectedEnrollment.status}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Requested
+                      </p>
+                      <p className="font-medium">{formatDate(selectedEnrollment.created_at)}</p>
+                    </div>
+                    {selectedEnrollment.updated_at !== selectedEnrollment.created_at && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Last Updated</p>
+                        <p className="font-medium">{formatDate(selectedEnrollment.updated_at)}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Course Information */}
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Course Information
+                  </h3>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Course Title</p>
+                      <p className="font-medium">{selectedEnrollment.courses?.title || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Course Code</p>
+                      <p className="font-medium">{selectedEnrollment.courses?.course_code || "N/A"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Student Performance */}
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <Award className="h-4 w-4" />
+                    Performance in Course
+                  </h3>
+                  
+                  {studentPerformance.loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      <span>Loading performance data...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Assignments */}
+                      <div>
+                        <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Assignments ({studentPerformance.assignments.length})
+                        </h4>
+                        {studentPerformance.assignments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No assignments submitted yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {studentPerformance.assignments.slice(0, 5).map((submission: any) => (
+                              <div key={submission.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{submission.assignments?.title || "Assignment"}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Submitted: {submission.submitted_at ? formatDate(submission.submitted_at) : "N/A"}
+                                  </p>
+                                </div>
+                                {submission.grade !== null && (
+                                  <Badge variant="outline">
+                                    {submission.grade} / {submission.assignments?.max_points || submission.max_points || "N/A"}
+                                  </Badge>
+                                )}
+                              </div>
+                            ))}
+                            {studentPerformance.assignments.length > 5 && (
+                              <p className="text-xs text-muted-foreground text-center">
+                                +{studentPerformance.assignments.length - 5} more assignments
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quizzes */}
+                      <div>
+                        <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Award className="h-4 w-4" />
+                          Quizzes ({studentPerformance.quizzes.length})
+                        </h4>
+                        {studentPerformance.quizzes.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No quizzes completed yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {studentPerformance.quizzes.slice(0, 5).map((attempt: any) => (
+                              <div key={attempt.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{attempt.quizzes?.title || "Quiz"}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Completed: {attempt.completed_at ? formatDate(attempt.completed_at) : "N/A"}
+                                  </p>
+                                </div>
+                                {attempt.score !== null && (
+                                  <Badge variant="outline">
+                                    {attempt.score} / {attempt.quizzes?.max_score || "N/A"}
+                                  </Badge>
+                                )}
+                              </div>
+                            ))}
+                            {studentPerformance.quizzes.length > 5 && (
+                              <p className="text-xs text-muted-foreground text-center">
+                                +{studentPerformance.quizzes.length - 5} more quizzes
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setSelectedEnrollment(null)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
