@@ -1286,10 +1286,6 @@ export function QuizManagement() {
                   <Label htmlFor="timeLimit">Time Limit (minutes)</Label>
                   <Input id="timeLimit" name="timeLimit" type="number" placeholder="30" required />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="attempts">Max Attempts</Label>
-                  <Input id="attempts" name="attempts" type="number" placeholder="2" required />
-                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Quiz Status</Label>
@@ -1409,7 +1405,6 @@ export function QuizManagement() {
                   <Users className="h-4 w-4" />
                       <span>{attemptsCount} attempts</span>
                 </div>
-                    <span className="text-xs text-gray-500">Max: {quiz.max_attempts}</span>
               </div>
 
               <div className="flex gap-2">
@@ -1888,16 +1883,7 @@ export function QuizManagement() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-attempts">Max Attempts</Label>
-                      <Input 
-                        id="edit-attempts" 
-                        type="number" 
-                        value={quizSettingsForm.max_attempts}
-                        onChange={(e) => setQuizSettingsForm({ ...quizSettingsForm, max_attempts: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
                       <Label>Quiz Status</Label>
                       <Select 

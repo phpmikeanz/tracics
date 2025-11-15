@@ -211,11 +211,6 @@ export function StudentQuizzes() {
       }
     }
     
-    // Check attempts
-    if (quiz.attempt && quiz.max_attempts && quiz.max_attempts <= 1) {
-      return 'locked'
-    }
-    
     return 'available'
   }
 
@@ -407,7 +402,7 @@ export function StudentQuizzes() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
                   <div className="flex items-center text-gray-600">
                     <Clock className="w-4 h-4 mr-2" />
                     Time Limit: {quiz.time_limit ? `${quiz.time_limit} min` : 'No limit'}
@@ -415,10 +410,6 @@ export function StudentQuizzes() {
                   <div className="flex items-center text-gray-600">
                     <HelpCircle className="w-4 h-4 mr-2" />
                     Questions: {quiz.questionCount || 0}
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Attempts: {quiz.attempt ? 1 : 0}/{quiz.max_attempts || 1}
                   </div>
                 </div>
 

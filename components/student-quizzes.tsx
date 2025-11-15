@@ -270,9 +270,6 @@ export function StudentQuizzes({ refreshTrigger }: { refreshTrigger?: any } = {}
                   </div>
 
                   <div className="flex items-center gap-4 text-sm">
-                    <span>
-                      Attempts: {quiz.attemptsUsed}/{quiz.attempts}
-                    </span>
                     {quiz.bestScore && (
                       <span>
                         Best Score: {quiz.bestScore}/{quiz.totalPoints} (
@@ -313,7 +310,7 @@ export function StudentQuizzes({ refreshTrigger }: { refreshTrigger?: any } = {}
                       </Button>
                     )}
 
-                    {quiz.status === "available" && quiz.attemptsUsed < quiz.attempts && (
+                    {quiz.status === "available" && (
                       <Dialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen}>
                         <DialogTrigger asChild>
                           <Button size="sm" onClick={() => setSelectedQuiz(quiz)}>
@@ -332,10 +329,6 @@ export function StudentQuizzes({ refreshTrigger }: { refreshTrigger?: any } = {}
                                 <li>• You have {selectedQuiz?.timeLimit} minutes to complete this quiz</li>
                                 <li>• You can navigate between questions freely</li>
                                 <li>• Your progress is automatically saved</li>
-                                <li>
-                                  • You have {selectedQuiz && selectedQuiz.attempts - selectedQuiz.attemptsUsed}{" "}
-                                  attempt(s) remaining
-                                </li>
                                 <li>• Make sure you have a stable internet connection</li>
                               </ul>
                             </div>
@@ -360,10 +353,6 @@ export function StudentQuizzes({ refreshTrigger }: { refreshTrigger?: any } = {}
                                   <span className="font-medium">Due Date:</span>{" "}
                                   {selectedQuiz && format(selectedQuiz.dueDate, "MMM d, yyyy")}
                                 </p>
-                                <p>
-                                  <span className="font-medium">Attempts:</span> {selectedQuiz?.attemptsUsed}/
-                                  {selectedQuiz?.attempts}
-                                </p>
                               </div>
                             </div>
 
@@ -376,12 +365,6 @@ export function StudentQuizzes({ refreshTrigger }: { refreshTrigger?: any } = {}
                           </div>
                         </DialogContent>
                       </Dialog>
-                    )}
-
-                    {quiz.status === "available" && quiz.attemptsUsed >= quiz.attempts && (
-                      <Button variant="outline" size="sm" disabled>
-                        No Attempts Left
-                      </Button>
                     )}
                   </div>
                 </div>
