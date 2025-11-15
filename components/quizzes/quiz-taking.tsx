@@ -684,7 +684,27 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       // Wait longer to ensure any pending state updates and DOM updates are complete
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      // CRITICAL: Get the most current answers - use functional update to get latest state
+      // CRITICAL STEP 1: Read answers from database FIRST (they should be there from auto-save)
+      // This is the source of truth - answers are saved immediately when clicked
+      let databaseAnswers: Record<string, string> = {}
+      try {
+        const { data: attemptData, error: dbError } = await supabase
+          .from('quiz_attempts')
+          .select('answers')
+          .eq('id', attempt.id)
+          .single()
+        
+        if (!dbError && attemptData?.answers) {
+          databaseAnswers = attemptData.answers as Record<string, string>
+          console.log('💾 Answers from database:', databaseAnswers, 'Count:', Object.keys(databaseAnswers).length)
+        } else {
+          console.warn('⚠️ Could not read answers from database:', dbError)
+        }
+      } catch (dbReadError) {
+        console.error('❌ Error reading from database:', dbReadError)
+      }
+
+      // CRITICAL STEP 2: Get the most current answers from state
       let currentAnswers: Record<string, string> = {}
       
       setQuizState((prev) => {
@@ -704,6 +724,15 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         currentAnswers = { ...answersRef.current }
         console.log('📊 Using ref answers (more than state):', currentAnswers)
       }
+      
+      // CRITICAL STEP 3: Merge database answers with state answers
+      // Database is source of truth (answers saved via handleAnswerChange)
+      // State might be more recent for just-clicked answers
+      const mergedFromDbAndState = { ...databaseAnswers, ...currentAnswers }
+      console.log('🔄 Merged database + state answers:', mergedFromDbAndState, 'Count:', Object.keys(mergedFromDbAndState).length)
+      
+      // Use merged answers as starting point
+      currentAnswers = mergedFromDbAndState
       
       console.log('📊 Final initial answers before DOM capture:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       
@@ -812,12 +841,13 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         }
         
         // Merge answers intelligently:
-        // 1. Start with state answers (most reliable, already saved via handleAnswerChange)
+        // 1. Start with currentAnswers (already merged from database + state)
         // 2. Add DOM answers for missing questions (catches recent selections)
         // 3. For text inputs, prefer DOM if it has a value (might have latest typing)
+        // 4. NEVER overwrite existing answers from database/state with empty DOM values
         const mergedAnswers = { ...currentAnswers }
         
-        console.log('🔄 Merging answers - State has:', Object.keys(currentAnswers).length, 'DOM has:', Object.keys(domAnswers).length)
+        console.log('🔄 Merging answers - Current (DB+State) has:', Object.keys(currentAnswers).length, 'DOM has:', Object.keys(domAnswers).length)
         
         Object.keys(domAnswers).forEach((questionId) => {
           const domValue = domAnswers[questionId]
@@ -941,15 +971,56 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       }
       
       // Wait a moment after save to ensure database consistency
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // CRITICAL: Re-read from database one more time before submission
+      // This ensures we're submitting the actual saved answers
+      try {
+        const { data: finalAttemptData } = await supabase
+          .from('quiz_attempts')
+          .select('answers')
+          .eq('id', attempt.id)
+          .single()
+        
+        if (finalAttemptData?.answers) {
+          const finalDbAnswers = finalAttemptData.answers as Record<string, string>
+          console.log('💾 Final database answers before submission:', finalDbAnswers, 'Count:', Object.keys(finalDbAnswers).length)
+          
+          // Merge with current answers (database takes precedence as source of truth)
+          currentAnswers = { ...currentAnswers, ...finalDbAnswers }
+          console.log('✅ Using final merged answers for submission:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+          
+          // Log each answer to verify
+          if (quizState.questions) {
+            quizState.questions.forEach((q) => {
+              const answer = currentAnswers[q.id]
+              console.log(`📝 Question ${q.id} (${q.type}):`, answer || 'NO ANSWER')
+            })
+          }
+        }
+      } catch (finalReadError) {
+        console.warn('⚠️ Could not re-read from database before submission:', finalReadError)
+        // Continue with currentAnswers we have
+      }
       
       // Submit the quiz with all current answers
       // Even if save failed, try to submit with what we have
-      console.log('📤 Submitting quiz with answers:', currentAnswers, 'Answer count:', Object.keys(currentAnswers).length)
+      console.log('📤 FINAL SUBMISSION - Submitting quiz with answers:', currentAnswers, 'Answer count:', Object.keys(currentAnswers).length)
+      
+      // Final verification - ensure we have at least some answers
+      if (Object.keys(currentAnswers).length === 0) {
+        console.error('❌ CRITICAL: No answers to submit!')
+        toast({
+          title: "Error",
+          description: "No answers found to submit. Please contact your instructor immediately.",
+          variant: "destructive",
+        })
+        return
+      }
       
       try {
         await submitQuizAttempt(attempt.id, currentAnswers)
-        console.log('✅ Quiz submission successful')
+        console.log('✅ Quiz submission successful with', Object.keys(currentAnswers).length, 'answers')
       } catch (submitError) {
         console.error('❌ Quiz submission failed:', submitError)
         
