@@ -493,13 +493,37 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       try {
         const domAnswers: Record<string, string> = {}
         
-        // Capture ALL radio buttons (checked ones)
+        // Method 1: Capture radio buttons by name attribute (most reliable for RadioGroup)
+        if (quizState.questions && quizState.questions.length > 0) {
+          quizState.questions.forEach((question) => {
+            if (question.type === 'multiple_choice' || question.type === 'true_false') {
+              // Try to find checked radio button by name attribute
+              const radioName = `question-${question.id}`
+              const checkedRadio = document.querySelector(`input[type="radio"][name="${radioName}"]:checked`) as HTMLInputElement
+              
+              if (checkedRadio && checkedRadio.value) {
+                domAnswers[question.id] = checkedRadio.value
+                console.log(`📻 Radio answer captured for question ${question.id} (manual submit, by name):`, checkedRadio.value)
+              } else {
+                // Fallback: try data-question-id
+                const checkedByDataId = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`) as HTMLInputElement
+                if (checkedByDataId && checkedByDataId.value) {
+                  domAnswers[question.id] = checkedByDataId.value
+                  console.log(`📻 Radio answer captured for question ${question.id} (manual submit, by data-id):`, checkedByDataId.value)
+                }
+              }
+            }
+          })
+        }
+        
+        // Method 2: Also capture ALL radio buttons as fallback
         const allRadioInputs = document.querySelectorAll('input[type="radio"]')
         allRadioInputs.forEach((input: any) => {
           if (input.checked) {
             const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
-            if (questionId && input.value) {
+            if (questionId && input.value && !domAnswers[questionId]) {
               domAnswers[questionId] = input.value
+              console.log(`📻 Radio answer captured for question ${questionId} (manual submit, fallback):`, input.value)
             }
           }
         })
@@ -660,15 +684,38 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
       try {
         const domAnswers: Record<string, string> = {}
         
-        // Method 1: Capture by data-question-id attributes
-        // Capture ALL radio buttons (checked and unchecked to find the checked one)
+        // Method 1: Capture radio buttons by name attribute (most reliable for RadioGroup)
+        // RadioGroup uses name attribute to group radio buttons
+        if (quizState.questions && quizState.questions.length > 0) {
+          quizState.questions.forEach((question) => {
+            if (question.type === 'multiple_choice' || question.type === 'true_false') {
+              // Try to find checked radio button by name attribute
+              const radioName = `question-${question.id}`
+              const checkedRadio = document.querySelector(`input[type="radio"][name="${radioName}"]:checked`) as HTMLInputElement
+              
+              if (checkedRadio && checkedRadio.value) {
+                domAnswers[question.id] = checkedRadio.value
+                console.log(`📻 Radio answer captured for question ${question.id} (by name):`, checkedRadio.value)
+              } else {
+                // Fallback: try data-question-id
+                const checkedByDataId = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`) as HTMLInputElement
+                if (checkedByDataId && checkedByDataId.value) {
+                  domAnswers[question.id] = checkedByDataId.value
+                  console.log(`📻 Radio answer captured for question ${question.id} (by data-id):`, checkedByDataId.value)
+                }
+              }
+            }
+          })
+        }
+        
+        // Method 2: Also capture ALL radio buttons as fallback
         const allRadioInputs = document.querySelectorAll('input[type="radio"]')
         allRadioInputs.forEach((input: any) => {
           if (input.checked) {
             const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
-            if (questionId && input.value) {
+            if (questionId && input.value && !domAnswers[questionId]) {
               domAnswers[questionId] = input.value
-              console.log(`📻 Radio answer captured for question ${questionId}:`, input.value)
+              console.log(`📻 Radio answer captured for question ${questionId} (fallback):`, input.value)
             }
           }
         })
@@ -695,42 +742,80 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
           }
         })
         
-        // Method 2: Iterate through ALL questions and try to find their inputs
-        // This is a fallback to ensure we don't miss anything
+        // Method 3: Final fallback - iterate through ALL questions and try to find their inputs
+        // This ensures we don't miss anything
         if (quizState.questions && quizState.questions.length > 0) {
           quizState.questions.forEach((question) => {
             // If we don't have an answer for this question yet, try to find it
             if (!domAnswers[question.id] && !currentAnswers[question.id]) {
-              // Try to find radio button for this question
-              const questionRadio = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`)
-              if (questionRadio) {
-                domAnswers[question.id] = (questionRadio as HTMLInputElement).value
-                console.log(`🔍 Found radio answer for question ${question.id} via search:`, (questionRadio as HTMLInputElement).value)
+              // For radio buttons, try multiple methods
+              if (question.type === 'multiple_choice' || question.type === 'true_false') {
+                // Try by name attribute first (most reliable)
+                const radioName = `question-${question.id}`
+                const questionRadio = document.querySelector(`input[type="radio"][name="${radioName}"]:checked`) as HTMLInputElement
+                if (questionRadio && questionRadio.value) {
+                  domAnswers[question.id] = questionRadio.value
+                  console.log(`🔍 Found radio answer for question ${question.id} via name search:`, questionRadio.value)
+                } else {
+                  // Try by data-question-id
+                  const questionRadioById = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`) as HTMLInputElement
+                  if (questionRadioById && questionRadioById.value) {
+                    domAnswers[question.id] = questionRadioById.value
+                    console.log(`🔍 Found radio answer for question ${question.id} via data-id search:`, questionRadioById.value)
+                  }
+                }
               }
               
               // Try to find textarea for this question
-              const questionTextarea = document.querySelector(`textarea[data-question-id="${question.id}"]`)
-              if (questionTextarea && (questionTextarea as HTMLTextAreaElement).value) {
-                domAnswers[question.id] = (questionTextarea as HTMLTextAreaElement).value
+              const questionTextarea = document.querySelector(`textarea[data-question-id="${question.id}"]`) as HTMLTextAreaElement
+              if (questionTextarea && questionTextarea.value) {
+                domAnswers[question.id] = questionTextarea.value
                 console.log(`🔍 Found textarea answer for question ${question.id} via search`)
               }
               
               // Try to find text input for this question
-              const questionTextInput = document.querySelector(`input[type="text"][data-question-id="${question.id}"]`)
-              if (questionTextInput && (questionTextInput as HTMLInputElement).value) {
-                domAnswers[question.id] = (questionTextInput as HTMLInputElement).value
+              const questionTextInput = document.querySelector(`input[type="text"][data-question-id="${question.id}"]`) as HTMLInputElement
+              if (questionTextInput && questionTextInput.value) {
+                domAnswers[question.id] = questionTextInput.value
                 console.log(`🔍 Found text input answer for question ${question.id} via search`)
               }
             }
           })
         }
         
-        // Merge DOM answers with state answers (DOM takes precedence for latest values)
-        // This ensures we capture the most recent input
-        currentAnswers = { ...currentAnswers, ...domAnswers }
+        // Merge answers intelligently:
+        // 1. Start with state answers (most reliable, already saved)
+        // 2. Add DOM answers for missing questions (catches recent selections)
+        // 3. For text inputs, prefer DOM if it has a value (might have latest typing)
+        const mergedAnswers = { ...currentAnswers }
+        
+        Object.keys(domAnswers).forEach((questionId) => {
+          const domValue = domAnswers[questionId]
+          const stateValue = mergedAnswers[questionId]
+          const question = quizState.questions?.find(q => q.id === questionId)
+          
+          // Only use DOM value if:
+          // 1. State doesn't have an answer for this question, OR
+          // 2. It's a text input and DOM has a value (might be more recent)
+          if (!stateValue) {
+            // State doesn't have it, use DOM
+            mergedAnswers[questionId] = domValue
+            console.log(`✅ Added missing answer from DOM for question ${questionId}:`, domValue)
+          } else if (question && (question.type === 'short_answer' || question.type === 'essay') && domValue) {
+            // For text inputs, prefer DOM if it has a value (might be more recent)
+            mergedAnswers[questionId] = domValue
+            console.log(`✅ Updated text answer from DOM for question ${questionId}`)
+          } else if (stateValue && !domValue) {
+            // State has it but DOM doesn't - keep state (radio button was selected earlier)
+            console.log(`✅ Keeping state answer for question ${questionId}:`, stateValue)
+          }
+        })
+        
+        currentAnswers = mergedAnswers
         console.log('✅ Final answers after comprehensive DOM capture:', currentAnswers)
         console.log('📊 Total answers captured:', Object.keys(currentAnswers).length, 'out of', quizState.questions?.length || 0, 'questions')
         console.log('📋 DOM answers found:', domAnswers)
+        console.log('📋 State answers:', currentAnswers)
         
         // Log which questions have answers and which don't
         if (quizState.questions) {
