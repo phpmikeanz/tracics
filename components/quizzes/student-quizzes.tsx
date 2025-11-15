@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { HelpCircle, Calendar, Clock, Play, Eye, CheckCircle, AlertCircle, BarChart3, Loader2, Lock, RefreshCw } from "lucide-react"
 import { format, isValid, parseISO } from "date-fns"
 import { useAuth } from "@/hooks/use-auth"
@@ -544,6 +544,9 @@ export function StudentQuizzes() {
             <DialogTitle>
               {showResults ? `Quiz Results - ${selectedQuiz?.title}` : selectedQuiz?.title}
             </DialogTitle>
+            <DialogDescription>
+              {showResults ? "View your quiz results and feedback." : "Take your quiz. The timer will continue running even if you close this dialog."}
+            </DialogDescription>
           </DialogHeader>
           {selectedQuiz && selectedQuiz.attempt && (
             <>

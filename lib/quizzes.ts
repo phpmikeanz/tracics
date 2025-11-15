@@ -594,50 +594,26 @@ export async function saveQuizAnswers(
       return false
     }
     
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('quiz_attempts')
       .update({ 
-        answers: answers,
-        updated_at: new Date().toISOString()
+        answers: answers
       })
       .eq('id', attemptId)
-      .select('answers')
-      .single()
 
     if (error) {
-      console.error('❌ Error auto-saving quiz answers:', error)
+      console.error('Error auto-saving quiz answers:', error)
       console.error('Error details:', {
         message: error.message,
         details: error.details,
         hint: error.hint,
         code: error.code
       })
-      
-      // Check if it's an RLS policy error
-      if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
-        console.error('🚨 RLS POLICY ERROR: Student may not have permission to update quiz_attempts!')
-        console.error('This is a database permission issue. Check RLS policies on quiz_attempts table.')
-      }
-      
       return false
     }
 
-    // Verify the update worked
-    if (data?.answers) {
-      const savedCount = Object.keys(data.answers).length
-      const expectedCount = Object.keys(answers).length
-      console.log('✅ Quiz answers auto-saved successfully for attempt:', attemptId)
-      console.log('✅ Saved', savedCount, 'answers (expected', expectedCount, ')')
-      
-      if (savedCount < expectedCount) {
-        console.warn('⚠️ Warning: Saved fewer answers than expected!')
-      }
-      
-      return true
-    } else {
-      console.error('❌ Save appeared successful but no data returned!')
-      return false
-    }
+    console.log('Quiz answers auto-saved successfully for attempt:', attemptId)
+    return true
   } catch (error) {
     console.error('Error in saveQuizAnswers:', error)
     return false
@@ -748,8 +724,7 @@ export async function submitQuizAttempt(
     const updateData: any = {
       answers: finalAnswers,
       status: finalStatus,
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      completed_at: new Date().toISOString()
     }
 
     if (finalScore !== undefined) {
