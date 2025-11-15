@@ -776,68 +776,18 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         variant: "destructive",
       })
 
-      // Wait longer to ensure any pending state updates and DOM updates are complete
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // EXACTLY LIKE MANUAL SUBMIT: Wait a brief moment to ensure any pending state updates are complete
+      await new Promise(resolve => setTimeout(resolve, 200))
 
-      // CRITICAL STEP 1: Read answers from database FIRST (they should be there from auto-save)
-      // This is the source of truth - answers are saved immediately when clicked
-      let databaseAnswers: Record<string, string> = {}
-      try {
-        const { data: attemptData, error: dbError } = await supabase
-          .from('quiz_attempts')
-          .select('answers')
-          .eq('id', attempt.id)
-          .single()
-        
-        if (!dbError && attemptData?.answers) {
-          databaseAnswers = attemptData.answers as Record<string, string>
-          console.log('💾 Answers from database:', databaseAnswers, 'Count:', Object.keys(databaseAnswers).length)
-        } else {
-          console.warn('⚠️ Could not read answers from database:', dbError)
-        }
-      } catch (dbReadError) {
-        console.error('❌ Error reading from database:', dbReadError)
-      }
-
-      // CRITICAL STEP 2: Get the most current answers from state
-      let currentAnswers: Record<string, string> = {}
+      // EXACTLY LIKE MANUAL SUBMIT: Get the most current answers from state
+      let currentAnswers = { ...quizState.answers }
+      console.log('📊 Initial answers from state (auto submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       
-      setQuizState((prev) => {
-        // Get latest from state
-        currentAnswers = { ...prev.answers }
-        console.log('📊 Latest answers from state:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
-        
-        // Also update ref to ensure it's in sync
-        answersRef.current = { ...prev.answers }
-        console.log('📊 Ref synchronized with state')
-        
-        return prev // Don't change state, just read it
-      })
-      
-      // Also check ref as backup
-      if (Object.keys(answersRef.current).length > Object.keys(currentAnswers).length) {
-        currentAnswers = { ...answersRef.current }
-        console.log('📊 Using ref answers (more than state):', currentAnswers)
-      }
-      
-      // CRITICAL STEP 3: Merge database answers with state answers
-      // Database is source of truth (answers saved via handleAnswerChange)
-      // State might be more recent for just-clicked answers
-      const mergedFromDbAndState = { ...databaseAnswers, ...currentAnswers }
-      console.log('🔄 Merged database + state answers:', mergedFromDbAndState, 'Count:', Object.keys(mergedFromDbAndState).length)
-      
-      // Use merged answers as starting point
-      currentAnswers = mergedFromDbAndState
-      
-      console.log('📊 Final initial answers before DOM capture:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
-      
-      // COMPREHENSIVE DOM CAPTURE - Capture ALL user input from ALL questions
-      // This ensures we capture ANY input the user has entered, even if partially typed
+      // EXACTLY LIKE MANUAL SUBMIT: COMPREHENSIVE DOM CAPTURE - Capture ALL user input from ALL questions
       try {
         const domAnswers: Record<string, string> = {}
         
         // Method 1: Capture radio buttons by name attribute (most reliable for RadioGroup)
-        // RadioGroup uses name attribute to group radio buttons
         if (quizState.questions && quizState.questions.length > 0) {
           quizState.questions.forEach((question) => {
             if (question.type === 'multiple_choice' || question.type === 'true_false') {
@@ -847,13 +797,13 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
               
               if (checkedRadio && checkedRadio.value) {
                 domAnswers[question.id] = checkedRadio.value
-                console.log(`📻 Radio answer captured for question ${question.id} (by name):`, checkedRadio.value)
+                console.log(`📻 Radio answer captured for question ${question.id} (auto submit, by name):`, checkedRadio.value)
               } else {
                 // Fallback: try data-question-id
                 const checkedByDataId = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`) as HTMLInputElement
                 if (checkedByDataId && checkedByDataId.value) {
                   domAnswers[question.id] = checkedByDataId.value
-                  console.log(`📻 Radio answer captured for question ${question.id} (by data-id):`, checkedByDataId.value)
+                  console.log(`📻 Radio answer captured for question ${question.id} (auto submit, by data-id):`, checkedByDataId.value)
                 }
               }
             }
@@ -867,314 +817,93 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
             const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
             if (questionId && input.value && !domAnswers[questionId]) {
               domAnswers[questionId] = input.value
-              console.log(`📻 Radio answer captured for question ${questionId} (fallback):`, input.value)
+              console.log(`📻 Radio answer captured for question ${questionId} (auto submit, fallback):`, input.value)
             }
           }
         })
         
-        // Capture ALL text inputs (even if empty - we'll filter later)
+        // Capture ALL text inputs (even partial input)
         const allTextInputs = document.querySelectorAll('input[type="text"]')
         allTextInputs.forEach((input: any) => {
           const questionId = input.getAttribute('data-question-id') || input.name?.replace('question-', '')
           if (questionId && input.value) {
-            // Capture even partial input - don't trim, save as-is
             domAnswers[questionId] = input.value
-            console.log(`📝 Text answer captured for question ${questionId}:`, input.value)
           }
         })
         
-        // Capture ALL textareas (even if partially typed)
+        // Capture ALL textareas (even partial input)
         const allTextareas = document.querySelectorAll('textarea')
         allTextareas.forEach((textarea: any) => {
           const questionId = textarea.getAttribute('data-question-id') || textarea.name?.replace('question-', '')
           if (questionId && textarea.value) {
-            // Capture even partial input - save as-is
             domAnswers[questionId] = textarea.value
-            console.log(`📄 Textarea answer captured for question ${questionId}:`, textarea.value.substring(0, 50) + '...')
           }
         })
         
-        // Method 3: Final fallback - iterate through ALL questions and try to find their inputs
-        // This ensures we don't miss anything
+        // Iterate through ALL questions to ensure we don't miss any
         if (quizState.questions && quizState.questions.length > 0) {
           quizState.questions.forEach((question) => {
-            // If we don't have an answer for this question yet, try to find it
             if (!domAnswers[question.id] && !currentAnswers[question.id]) {
-              // For radio buttons, try multiple methods
-              if (question.type === 'multiple_choice' || question.type === 'true_false') {
-                // Try by name attribute first (most reliable)
-                const radioName = `question-${question.id}`
-                const questionRadio = document.querySelector(`input[type="radio"][name="${radioName}"]:checked`) as HTMLInputElement
-                if (questionRadio && questionRadio.value) {
-                  domAnswers[question.id] = questionRadio.value
-                  console.log(`🔍 Found radio answer for question ${question.id} via name search:`, questionRadio.value)
-                } else {
-                  // Try by data-question-id
-                  const questionRadioById = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`) as HTMLInputElement
-                  if (questionRadioById && questionRadioById.value) {
-                    domAnswers[question.id] = questionRadioById.value
-                    console.log(`🔍 Found radio answer for question ${question.id} via data-id search:`, questionRadioById.value)
-                  }
-                }
+              const questionRadio = document.querySelector(`input[type="radio"][data-question-id="${question.id}"]:checked`)
+              if (questionRadio) {
+                domAnswers[question.id] = (questionRadio as HTMLInputElement).value
               }
               
-              // Try to find textarea for this question
-              const questionTextarea = document.querySelector(`textarea[data-question-id="${question.id}"]`) as HTMLTextAreaElement
-              if (questionTextarea && questionTextarea.value) {
-                domAnswers[question.id] = questionTextarea.value
-                console.log(`🔍 Found textarea answer for question ${question.id} via search`)
+              const questionTextarea = document.querySelector(`textarea[data-question-id="${question.id}"]`)
+              if (questionTextarea && (questionTextarea as HTMLTextAreaElement).value) {
+                domAnswers[question.id] = (questionTextarea as HTMLTextAreaElement).value
               }
               
-              // Try to find text input for this question
-              const questionTextInput = document.querySelector(`input[type="text"][data-question-id="${question.id}"]`) as HTMLInputElement
-              if (questionTextInput && questionTextInput.value) {
-                domAnswers[question.id] = questionTextInput.value
-                console.log(`🔍 Found text input answer for question ${question.id} via search`)
+              const questionTextInput = document.querySelector(`input[type="text"][data-question-id="${question.id}"]`)
+              if (questionTextInput && (questionTextInput as HTMLInputElement).value) {
+                domAnswers[question.id] = (questionTextInput as HTMLInputElement).value
               }
             }
           })
         }
         
-        // Merge answers intelligently:
-        // 1. Start with currentAnswers (already merged from database + state)
-        // 2. Add DOM answers for missing questions (catches recent selections)
-        // 3. For text inputs, prefer DOM if it has a value (might have latest typing)
-        // 4. NEVER overwrite existing answers from database/state with empty DOM values
-        const mergedAnswers = { ...currentAnswers }
-        
-        console.log('🔄 Merging answers - Current (DB+State) has:', Object.keys(currentAnswers).length, 'DOM has:', Object.keys(domAnswers).length)
-        
-        Object.keys(domAnswers).forEach((questionId) => {
-          const domValue = domAnswers[questionId]
-          const stateValue = mergedAnswers[questionId]
-          const question = quizState.questions?.find(q => q.id === questionId)
-          
-          // Only use DOM value if:
-          // 1. State doesn't have an answer for this question, OR
-          // 2. It's a text input and DOM has a value (might be more recent)
-          if (!stateValue) {
-            // State doesn't have it, use DOM
-            mergedAnswers[questionId] = domValue
-            console.log(`✅ Added missing answer from DOM for question ${questionId}:`, domValue)
-          } else if (question && (question.type === 'short_answer' || question.type === 'essay') && domValue) {
-            // For text inputs, prefer DOM if it has a value (might be more recent)
-            mergedAnswers[questionId] = domValue
-            console.log(`✅ Updated text answer from DOM for question ${questionId}`)
-          } else if (stateValue) {
-            // State has it - ALWAYS keep state for radio buttons (most reliable)
-            // Don't overwrite with DOM for radio buttons
-            console.log(`✅ Keeping state answer for question ${questionId} (${question?.type}):`, stateValue)
-          }
-        })
-        
-        // Final verification: Log all answers by question type
-        if (quizState.questions) {
-          quizState.questions.forEach((q) => {
-            if (q.type === 'multiple_choice' || q.type === 'true_false') {
-              const answer = mergedAnswers[q.id]
-              console.log(`📻 Radio question ${q.id} (${q.type}):`, answer || 'NO ANSWER')
-            }
-          })
-        }
-        
-        currentAnswers = mergedAnswers
-        console.log('✅ Final answers after comprehensive DOM capture:', currentAnswers)
-        console.log('📊 Total answers captured:', Object.keys(currentAnswers).length, 'out of', quizState.questions?.length || 0, 'questions')
-        console.log('📋 DOM answers found:', domAnswers)
-        console.log('📋 State answers:', currentAnswers)
-        
-        // Log which questions have answers and which don't
-        if (quizState.questions) {
-          quizState.questions.forEach((q) => {
-            if (currentAnswers[q.id]) {
-              console.log(`✅ Question ${q.id} has answer:`, currentAnswers[q.id].substring(0, 50))
-            } else {
-              console.log(`❌ Question ${q.id} has NO answer`)
-            }
-          })
-        }
+        // EXACTLY LIKE MANUAL SUBMIT: Merge DOM answers with state answers (DOM takes precedence)
+        currentAnswers = { ...currentAnswers, ...domAnswers }
+        console.log('✅ Answers after DOM capture (auto submit):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
       } catch (domError) {
-        console.error('⚠️ Error capturing answers from DOM:', domError)
+        console.warn('⚠️ Error capturing answers from DOM (auto submit):', domError)
         // Continue with state answers only
       }
       
-      // CRITICAL: If we still don't have answers, try one more database read
-      if (!currentAnswers || Object.keys(currentAnswers).length === 0) {
-        console.warn('⚠️ WARNING: No answers found after DOM capture! Trying final database read...')
-        
+      // EXACTLY LIKE MANUAL SUBMIT: Final save of all answers before submission
+      console.log('Final save before auto submission:', currentAnswers)
+      await saveQuizAnswers(attempt.id, currentAnswers)
+      
+      // EXACTLY LIKE MANUAL SUBMIT: Submit the quiz - this will trigger database notifications automatically
+      await submitQuizAttempt(attempt.id, currentAnswers)
+      
+      // EXACTLY LIKE MANUAL SUBMIT: Additional activity tracking
+      if (user?.id && quiz.course_id) {
         try {
-          const { data: finalDbRead, error: finalDbError } = await supabase
-            .from('quiz_attempts')
-            .select('answers')
-            .eq('id', attempt.id)
-            .single()
-          
-          if (!finalDbError && finalDbRead?.answers && Object.keys(finalDbRead.answers).length > 0) {
-            currentAnswers = finalDbRead.answers as Record<string, string>
-            console.log('✅ FINAL RESCUE: Found answers in database:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
-          } else {
-            console.error('❌ CRITICAL: No answers found in database either!', finalDbError)
-            console.error('Database read result:', finalDbRead)
-            
-            // Last resort: Check if answers were ever saved
-            console.log('🔍 Checking if answers were saved during quiz...')
-            console.log('State answers history:', quizState.answers)
-            console.log('Ref answers:', answersRef.current)
-            
-            toast({
-              title: "⚠️ Critical Warning",
-              description: "No answers were found. Your answers may not have been saved. Please contact your instructor immediately.",
-              variant: "destructive",
-            })
-          }
-        } catch (finalReadError) {
-          console.error('❌ Error in final database read:', finalReadError)
-        }
-      }
-      
-      // Final check before proceeding
-      if (!currentAnswers || Object.keys(currentAnswers).length === 0) {
-        console.error('❌ CRITICAL ERROR: Cannot proceed with submission - no answers found anywhere!')
-        console.error('This should not happen. Answers should have been saved when clicked.')
-        return // Don't submit with empty answers
-      } else {
-        console.log('✅ Final answers to submit:', currentAnswers, 'Total:', Object.keys(currentAnswers).length)
-      }
-      
-      // CRITICAL: Save answers FIRST before submission
-      // This ensures answers are in the database even if submission fails
-      let saveSuccess = false
-      let retryCount = 0
-      const maxRetries = 5 // Increased retries
-      
-      console.log('💾 Starting critical save operation with', Object.keys(currentAnswers).length, 'answers')
-      
-      while (!saveSuccess && retryCount < maxRetries) {
-        try {
-          const saveResult = await saveQuizAnswers(attempt.id, currentAnswers)
-          if (saveResult) {
-            saveSuccess = true
-            console.log('✅ Final save successful on attempt:', retryCount + 1, 'with', Object.keys(currentAnswers).length, 'answers')
-            
-            // Verify the save by reading back from database
-            const { data: verifyAttempt } = await supabase
-              .from('quiz_attempts')
-              .select('answers')
-              .eq('id', attempt.id)
-              .single()
-            
-            if (verifyAttempt?.answers) {
-              const savedCount = Object.keys(verifyAttempt.answers).length
-              console.log('✅ Verified save: Database has', savedCount, 'answers')
-              if (savedCount < Object.keys(currentAnswers).length) {
-                console.warn('⚠️ Warning: Database has fewer answers than we tried to save. Retrying...')
-                saveSuccess = false
-                retryCount++
-                await new Promise(resolve => setTimeout(resolve, 300))
-                continue
-              }
+          await trackStudentActivity(
+            user.id,
+            quiz.course_id,
+            'quiz_completed',
+            {
+              quizTitle: quiz.title,
+              completedAt: new Date().toISOString()
             }
-          } else {
-            throw new Error('Save returned false')
-          }
-        } catch (saveError) {
-          retryCount++
-          console.error(`❌ Final save failed on attempt ${retryCount}:`, saveError)
-          if (retryCount < maxRetries) {
-            // Wait progressively longer before retrying
-            await new Promise(resolve => setTimeout(resolve, 300 * retryCount))
-          }
-        }
-      }
-      
-      if (!saveSuccess) {
-        console.error('❌ CRITICAL: Final save failed after all retries!')
-        toast({
-          title: "⚠️ Warning",
-          description: "Some answers may not have been saved. Please contact your instructor immediately.",
-          variant: "destructive",
-        })
-      }
-      
-      // Wait a moment after save to ensure database consistency
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // CRITICAL: Re-read from database one more time before submission
-      // This ensures we're submitting the actual saved answers
-      try {
-        const { data: finalAttemptData } = await supabase
-          .from('quiz_attempts')
-          .select('answers')
-          .eq('id', attempt.id)
-          .single()
-        
-        if (finalAttemptData?.answers) {
-          const finalDbAnswers = finalAttemptData.answers as Record<string, string>
-          console.log('💾 Final database answers before submission:', finalDbAnswers, 'Count:', Object.keys(finalDbAnswers).length)
+          )
           
-          // Merge with current answers (database takes precedence as source of truth)
-          currentAnswers = { ...currentAnswers, ...finalDbAnswers }
-          console.log('✅ Using final merged answers for submission:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
-          
-          // Log each answer to verify
-          if (quizState.questions) {
-            quizState.questions.forEach((q) => {
-              const answer = currentAnswers[q.id]
-              console.log(`📝 Question ${q.id} (${q.type}):`, answer || 'NO ANSWER')
-            })
-          }
-        }
-      } catch (finalReadError) {
-        console.warn('⚠️ Could not re-read from database before submission:', finalReadError)
-        // Continue with currentAnswers we have
-      }
-      
-      // Submit the quiz with all current answers
-      // Even if save failed, try to submit with what we have
-      console.log('📤 FINAL SUBMISSION - Submitting quiz with answers:', currentAnswers, 'Answer count:', Object.keys(currentAnswers).length)
-      
-      // Final verification - ensure we have at least some answers
-      if (Object.keys(currentAnswers).length === 0) {
-        console.error('❌ CRITICAL: No answers to submit!')
-        toast({
-          title: "Error",
-          description: "No answers found to submit. Please contact your instructor immediately.",
-          variant: "destructive",
-        })
-        return
-      }
-      
-      try {
-        await submitQuizAttempt(attempt.id, currentAnswers)
-        console.log('✅ Quiz submission successful with', Object.keys(currentAnswers).length, 'answers')
-      } catch (submitError) {
-        console.error('❌ Quiz submission failed:', submitError)
-        
-        // If submission fails but save succeeded, answers are still in database
-        if (saveSuccess) {
-          console.log('✅ Answers were saved before submission failed. Attempt status may need manual update.')
-          toast({
-            title: "Partial Success",
-            description: "Your answers were saved but submission failed. Please contact your instructor.",
-            variant: "default",
-          })
-        } else {
-          throw submitError // Re-throw if both save and submit failed
+          console.log("Student activity tracked for quiz completion:", quiz.title)
+        } catch (activityError) {
+          console.log("Activity tracking failed, but quiz was submitted:", activityError)
         }
       }
       
-      // Note: Notifications are now handled automatically by database triggers
-      // No need for client-side notification creation to avoid RLS errors
-      console.log("Quiz submitted successfully - notifications will be created by database triggers")
-      
-      // Update state
+      // EXACTLY LIKE MANUAL SUBMIT: Update state
       setQuizState((prev) => ({ ...prev, isSubmitted: true, isAutoSubmitting: false }))
       
-      // Show success notification with answer count
+      // EXACTLY LIKE MANUAL SUBMIT: Show success notification
       const answeredCount = Object.keys(currentAnswers).length
       toast({
         title: "Quiz Auto-Submitted",
-        description: `Your quiz has been automatically submitted. ${answeredCount} answers have been saved.`,
+        description: `Quiz automatically submitted. ${answeredCount} answers have been saved.`,
       })
 
       if (onComplete) {
