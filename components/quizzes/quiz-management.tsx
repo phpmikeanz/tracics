@@ -321,9 +321,8 @@ export function QuizManagement() {
       const title = formData.get("title") as string
       const description = formData.get("description") as string
       const timeLimit = formData.get("timeLimit") as string
-      const attempts = formData.get("attempts") as string
 
-      if (!courseId || !title || !description || !timeLimit || !attempts) {
+      if (!courseId || !title || !description || !timeLimit) {
         toast({
           title: "Error",
           description: "Please fill in all required fields.",
@@ -346,7 +345,7 @@ export function QuizManagement() {
         title: title,
         description: description,
         time_limit: Number.parseInt(timeLimit) || null,
-        max_attempts: Number.parseInt(attempts) || 1,
+        max_attempts: 0, // Set to 0 for unlimited attempts
         due_date: dueDate?.toISOString() || null,
         status: formData.get("status") as "draft" | "published" | "closed",
       }
