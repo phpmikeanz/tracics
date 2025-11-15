@@ -958,6 +958,7 @@ export async function getQuizAttemptsForGrading(quizId: string): Promise<QuizAtt
 }
 
 // Get questions that need manual grading for a specific attempt
+// Returns ALL questions (including auto-graded) so faculty can see full breakdown
 export async function getQuestionsNeedingGrading(attemptId: string): Promise<QuizQuestion[]> {
   try {
     const supabase = createClient()
@@ -977,11 +978,11 @@ export async function getQuestionsNeedingGrading(attemptId: string): Promise<Qui
       throw attemptError
     }
 
+    // Get ALL questions (not just manual ones) so faculty can see complete breakdown
     const { data: questions, error: questionsError } = await supabase
       .from('quiz_questions')
       .select('*')
       .eq('quiz_id', attempt.quiz_id)
-      .in('type', ['short_answer', 'essay'])
       .order('order_index', { ascending: true })
 
     if (questionsError) {
@@ -989,12 +990,9 @@ export async function getQuestionsNeedingGrading(attemptId: string): Promise<Qui
       throw questionsError
     }
 
-    // Filter questions that have answers
-    const questionsWithAnswers = questions?.filter(question => 
-      attempt.answers && attempt.answers[question.id]
-    ) || []
-
-    return questionsWithAnswers
+    // Return all questions - don't filter by type or answers
+    // This allows faculty to see all questions including auto-graded ones
+    return questions || []
   } catch (error) {
     console.error('Error in getQuestionsNeedingGrading:', error)
     throw error
@@ -1147,8 +1145,11 @@ export async function gradeQuestion(
         const studentAnswer = attemptData.answers[question.id]
         
         if (question.type === 'multiple_choice' || question.type === 'true_false') {
-          // Auto-grade multiple choice and true/false
-          if (studentAnswer === question.correct_answer) {
+          // Auto-grade multiple choice and true/false with normalized comparison
+          const normalizedStudentAnswer = studentAnswer ? String(studentAnswer).trim().toLowerCase() : ''
+          const normalizedCorrectAnswer = question.correct_answer ? String(question.correct_answer).trim().toLowerCase() : ''
+          
+          if (normalizedStudentAnswer === normalizedCorrectAnswer) {
             totalScore += question.points
           }
         } else if (question.type === 'short_answer' || question.type === 'essay') {
@@ -1555,12 +1556,15 @@ export async function calculateTotalScoreFromDB(attemptId: string): Promise<numb
       }
 
       if (question.type === 'multiple_choice' || question.type === 'true_false') {
-        // Auto-grade multiple choice and true/false
-        if (studentAnswer === question.correct_answer) {
+        // Auto-grade multiple choice and true/false with normalized comparison
+        const normalizedStudentAnswer = studentAnswer ? String(studentAnswer).trim().toLowerCase() : ''
+        const normalizedCorrectAnswer = question.correct_answer ? String(question.correct_answer).trim().toLowerCase() : ''
+        
+        if (normalizedStudentAnswer === normalizedCorrectAnswer) {
           totalScore += question.points
-          console.log(`Auto-graded question ${question.id}: +${question.points} points`)
+          console.log(`Auto-graded question ${question.id}: +${question.points} points (Correct)`)
         } else {
-          console.log(`Auto-graded question ${question.id}: 0 points (incorrect)`)
+          console.log(`Auto-graded question ${question.id}: 0 points (Incorrect - Student: "${studentAnswer}", Correct: "${question.correct_answer}")`)
         }
       } else if (question.type === 'short_answer' || question.type === 'essay') {
         // Use manual grade if available
@@ -2123,13 +2127,16 @@ export async function calculateTotalScore(attemptId: string): Promise<number> {
       }
 
       if (question.type === 'multiple_choice' || question.type === 'true_false') {
-        // Auto-grade multiple choice and true/false
-        if (studentAnswer === question.correct_answer) {
+        // Auto-grade multiple choice and true/false with normalized comparison
+        const normalizedStudentAnswer = studentAnswer ? String(studentAnswer).trim().toLowerCase() : ''
+        const normalizedCorrectAnswer = question.correct_answer ? String(question.correct_answer).trim().toLowerCase() : ''
+        
+        if (normalizedStudentAnswer === normalizedCorrectAnswer) {
           autoScore += question.points
           totalScore += question.points
           console.log(`  → AUTO-GRADED: +${question.points} points (CORRECT)`)
         } else {
-          console.log(`  → AUTO-GRADED: 0 points (incorrect, answer: ${studentAnswer}, correct: ${question.correct_answer})`)
+          console.log(`  → AUTO-GRADED: 0 points (incorrect, student: "${studentAnswer}", correct: "${question.correct_answer}")`)
         }
       } else if (question.type === 'short_answer' || question.type === 'essay') {
         // Use manual grade if available
@@ -2841,13 +2848,27 @@ export async function getScoreBreakdown(attemptId: string): Promise<any> {
 
       if (question.type === 'multiple_choice' || question.type === 'true_false') {
         questionData.correctAnswer = question.correct_answer
-        if (studentAnswer === question.correct_answer) {
+        // Normalize answers for comparison (trim whitespace, handle case sensitivity)
+        const normalizedStudentAnswer = studentAnswer ? String(studentAnswer).trim() : ''
+        const normalizedCorrectAnswer = question.correct_answer ? String(question.correct_answer).trim() : ''
+        
+        // Compare answers (case-insensitive for better matching)
+        const isCorrect = normalizedStudentAnswer.toLowerCase() === normalizedCorrectAnswer.toLowerCase()
+        
+        console.log(`Auto-grading question ${question.id}:`, {
+          studentAnswer: normalizedStudentAnswer,
+          correctAnswer: normalizedCorrectAnswer,
+          isCorrect,
+          points: question.points
+        })
+        
+        if (isCorrect) {
           questionData.pointsEarned = question.points
           autoScore += question.points
           questionData.gradingMethod = 'Auto-graded (Correct)'
         } else {
           questionData.pointsEarned = 0
-          questionData.gradingMethod = 'Auto-graded (Incorrect)'
+          questionData.gradingMethod = `Auto-graded (Incorrect - Student: "${normalizedStudentAnswer}", Correct: "${normalizedCorrectAnswer}")`
         }
       } else if (question.type === 'short_answer' || question.type === 'essay') {
         const grade = grades?.find(g => g.question_id === question.id)

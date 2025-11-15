@@ -927,7 +927,13 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">
-                    Question {currentQuestionIndex + 1}: {currentQuestion.type === 'short_answer' ? 'Short Answer' : 'Essay'}
+                    Question {currentQuestionIndex + 1}: {
+                      currentQuestion.type === 'short_answer' ? 'Short Answer' : 
+                      currentQuestion.type === 'essay' ? 'Essay' :
+                      currentQuestion.type === 'multiple_choice' ? 'Multiple Choice' :
+                      currentQuestion.type === 'true_false' ? 'True/False' :
+                      currentQuestion.type
+                    }
                   </CardTitle>
                   <Badge variant={getQuestionStatus(currentQuestion.id) === 'graded' ? 'default' : 'secondary'}>
                     {getQuestionStatus(currentQuestion.id) === 'graded' ? (
@@ -959,7 +965,51 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
                   </div>
                 </div>
 
-                {/* Grading Form */}
+                {/* Auto-graded questions display (read-only) */}
+                {(currentQuestion.type === 'multiple_choice' || currentQuestion.type === 'true_false') && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <Label className="text-sm font-medium text-green-700">Auto-Graded Question</Label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm text-gray-600">Student Answer</Label>
+                        <p className="mt-1 p-2 bg-white rounded border">{attempt.answers[currentQuestion.id] || 'No answer'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-600">Correct Answer</Label>
+                        <p className="mt-1 p-2 bg-white rounded border">{currentQuestion.correct_answer || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Label className="text-sm text-gray-600">Points Earned</Label>
+                      <div className="mt-1 p-3 bg-white rounded border text-center">
+                        {(() => {
+                          const studentAnswer = attempt.answers[currentQuestion.id]
+                          const normalizedStudent = studentAnswer ? String(studentAnswer).trim().toLowerCase() : ''
+                          const normalizedCorrect = currentQuestion.correct_answer ? String(currentQuestion.correct_answer).trim().toLowerCase() : ''
+                          const isCorrect = normalizedStudent === normalizedCorrect
+                          return (
+                            <div>
+                              <span className={`text-2xl font-bold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                {isCorrect ? currentQuestion.points : 0}
+                              </span>
+                              <span className="text-gray-600"> / {currentQuestion.points}</span>
+                              <p className="text-sm mt-1 text-gray-600">
+                                {isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                              </p>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Manual Grading Form (only for essay/short answer) */}
+                {(currentQuestion.type === 'short_answer' || currentQuestion.type === 'essay') && (
+                  <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor={`points-${currentQuestion.id}`}>
@@ -1089,51 +1139,43 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleGradeQuestion(currentQuestion.id)}
-                    disabled={(() => {
-                      const points = pointsAwarded[currentQuestion.id]
-                      const error = validationErrors[currentQuestion.id]
-                      const isDisabled = grading || !points || error !== ''
-                      
-                      console.log('🔍 Button disabled check:', {
-                        points,
-                        error,
-                        grading,
-                        isDisabled,
-                        reasons: {
+                  {(currentQuestion.type === 'short_answer' || currentQuestion.type === 'essay') && (
+                    <Button
+                      onClick={() => handleGradeQuestion(currentQuestion.id)}
+                      disabled={(() => {
+                        const points = pointsAwarded[currentQuestion.id]
+                        const error = validationErrors[currentQuestion.id]
+                        const isDisabled = grading || !points || error !== ''
+                        
+                        console.log('🔍 Button disabled check:', {
+                          points,
+                          error,
                           grading,
-                          noPoints: !points,
-                          hasError: error !== ''
-                        }
-                      })
-                      
-                      return isDisabled
-                    })()}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {grading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Grading...
-                      </>
-                    ) : (
-                      <>
-                        <Star className="h-4 w-4 mr-2" />
-                        Save Grade
-                      </>
-                    )}
-                  </Button>
-                  
-                  {/* Debug button hidden as requested */}
-                  {/* <Button
-                    onClick={handleDebugManualGrading}
-                    disabled={grading}
-                    variant="outline"
-                    className="border-orange-500 text-orange-600 hover:bg-orange-50"
-                  >
-                    🔍 Debug
-                  </Button> */}
+                          isDisabled,
+                          reasons: {
+                            grading,
+                            noPoints: !points,
+                            hasError: error !== ''
+                          }
+                        })
+                        
+                        return isDisabled
+                      })()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {grading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Grading...
+                        </>
+                      ) : (
+                        <>
+                          <Star className="h-4 w-4 mr-2" />
+                          Save Grade
+                        </>
+                      )}
+                    </Button>
+                  )}
                   
                   {getQuestionStatus(currentQuestion.id) === 'graded' && (
                     <Button variant="outline" disabled>
@@ -1142,6 +1184,8 @@ export function ManualGrading({ attempt, isOpen, onClose, onGradingComplete }: M
                     </Button>
                   )}
                 </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
