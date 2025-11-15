@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { getQuizQuestions, submitQuizAttempt, getQuestionGrades, saveQuizAnswers } from "@/lib/quizzes"
 import { notifyFacultyQuizStarted, notifyFacultyQuizCompleted, trackStudentActivity } from "@/lib/faculty-activity-notifications"
+import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/types"
 
 type Quiz = Database["public"]["Tables"]["quizzes"]["Row"] & {
@@ -44,6 +45,7 @@ interface QuizState {
 export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClient()
   
   // Set quiz ID in window for debugging
   if (typeof window !== 'undefined') {
@@ -637,12 +639,21 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         variant: "destructive",
       })
 
-      // Wait a brief moment to ensure any pending state updates are complete
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Wait longer to ensure any pending state updates and DOM updates are complete
+      await new Promise(resolve => setTimeout(resolve, 500))
 
-      // Get the most current answers from state
-      let currentAnswers = { ...quizState.answers }
-      console.log('📊 Initial answers from state:', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      // Get the most current answers from state (use ref for latest value)
+      let currentAnswers = { ...answersRef.current }
+      console.log('📊 Initial answers from state (via ref):', currentAnswers, 'Count:', Object.keys(currentAnswers).length)
+      
+      // Also get from state as backup
+      setQuizState((prev) => {
+        if (Object.keys(prev.answers).length > Object.keys(currentAnswers).length) {
+          currentAnswers = { ...prev.answers }
+          console.log('📊 Updated answers from state (more answers found):', currentAnswers)
+        }
+        return prev
+      })
       
       // COMPREHENSIVE DOM CAPTURE - Capture ALL user input from ALL questions
       // This ensures we capture ANY input the user has entered, even if partially typed
@@ -748,33 +759,86 @@ export function QuizTaking({ quiz, attempt, onComplete }: QuizTakingProps) {
         console.log('✅ Final answers to submit:', currentAnswers, 'Total:', Object.keys(currentAnswers).length)
       }
       
-      // Ensure we have the latest answers by doing a final save with retry
+      // CRITICAL: Save answers FIRST before submission
+      // This ensures answers are in the database even if submission fails
       let saveSuccess = false
       let retryCount = 0
-      const maxRetries = 3
+      const maxRetries = 5 // Increased retries
+      
+      console.log('💾 Starting critical save operation with', Object.keys(currentAnswers).length, 'answers')
       
       while (!saveSuccess && retryCount < maxRetries) {
         try {
-          await saveQuizAnswers(attempt.id, currentAnswers)
-          saveSuccess = true
-          console.log('✅ Final save successful on attempt:', retryCount + 1, 'with', Object.keys(currentAnswers).length, 'answers')
+          const saveResult = await saveQuizAnswers(attempt.id, currentAnswers)
+          if (saveResult) {
+            saveSuccess = true
+            console.log('✅ Final save successful on attempt:', retryCount + 1, 'with', Object.keys(currentAnswers).length, 'answers')
+            
+            // Verify the save by reading back from database
+            const { data: verifyAttempt } = await supabase
+              .from('quiz_attempts')
+              .select('answers')
+              .eq('id', attempt.id)
+              .single()
+            
+            if (verifyAttempt?.answers) {
+              const savedCount = Object.keys(verifyAttempt.answers).length
+              console.log('✅ Verified save: Database has', savedCount, 'answers')
+              if (savedCount < Object.keys(currentAnswers).length) {
+                console.warn('⚠️ Warning: Database has fewer answers than we tried to save. Retrying...')
+                saveSuccess = false
+                retryCount++
+                await new Promise(resolve => setTimeout(resolve, 300))
+                continue
+              }
+            }
+          } else {
+            throw new Error('Save returned false')
+          }
         } catch (saveError) {
           retryCount++
           console.error(`❌ Final save failed on attempt ${retryCount}:`, saveError)
           if (retryCount < maxRetries) {
-            // Wait a bit before retrying
-            await new Promise(resolve => setTimeout(resolve, 500))
+            // Wait progressively longer before retrying
+            await new Promise(resolve => setTimeout(resolve, 300 * retryCount))
           }
         }
       }
       
       if (!saveSuccess) {
-        console.warn('⚠️ Final save failed after all retries, proceeding with submission anyway')
+        console.error('❌ CRITICAL: Final save failed after all retries!')
+        toast({
+          title: "⚠️ Warning",
+          description: "Some answers may not have been saved. Please contact your instructor immediately.",
+          variant: "destructive",
+        })
       }
       
+      // Wait a moment after save to ensure database consistency
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
       // Submit the quiz with all current answers
+      // Even if save failed, try to submit with what we have
       console.log('📤 Submitting quiz with answers:', currentAnswers, 'Answer count:', Object.keys(currentAnswers).length)
-      await submitQuizAttempt(attempt.id, currentAnswers)
+      
+      try {
+        await submitQuizAttempt(attempt.id, currentAnswers)
+        console.log('✅ Quiz submission successful')
+      } catch (submitError) {
+        console.error('❌ Quiz submission failed:', submitError)
+        
+        // If submission fails but save succeeded, answers are still in database
+        if (saveSuccess) {
+          console.log('✅ Answers were saved before submission failed. Attempt status may need manual update.')
+          toast({
+            title: "Partial Success",
+            description: "Your answers were saved but submission failed. Please contact your instructor.",
+            variant: "default",
+          })
+        } else {
+          throw submitError // Re-throw if both save and submit failed
+        }
+      }
       
       // Note: Notifications are now handled automatically by database triggers
       // No need for client-side notification creation to avoid RLS errors

@@ -697,17 +697,23 @@ export async function submitQuizAttempt(
     finalStatus = 'completed'
   }
     
+    // Ensure answers are always included, even if empty
     const updateData: any = {
-      answers,
+      answers: answers || {},
       status: finalStatus,
-      completed_at: new Date().toISOString()
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
 
     if (finalScore !== undefined) {
       updateData.score = finalScore
     }
 
-    console.log('Updating quiz attempt with data:', updateData)
+    console.log('Updating quiz attempt with data:', {
+      ...updateData,
+      answerCount: Object.keys(updateData.answers).length,
+      answers: updateData.answers // Log actual answers for debugging
+    })
 
     const { data, error } = await supabase
       .from('quiz_attempts')
