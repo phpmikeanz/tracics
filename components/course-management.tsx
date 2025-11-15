@@ -236,9 +236,9 @@ export function CourseManagement() {
                       <SelectValue placeholder="Select semester" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Fall 2024">Fall 2024</SelectItem>
-                      <SelectItem value="Spring 2025">Spring 2025</SelectItem>
-                      <SelectItem value="Summer 2025">Summer 2025</SelectItem>
+                      <SelectItem value="1st Semester">1st Semester</SelectItem>
+                      <SelectItem value="2nd Semester">2nd Semester</SelectItem>
+                      <SelectItem value="Summer">Summer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
