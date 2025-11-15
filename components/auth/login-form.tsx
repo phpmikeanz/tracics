@@ -370,8 +370,15 @@ export function LoginForm() {
                       {success}
                     </div>
                   )}
-                  <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled>
-                    Create Account
+                  <Button type="submit" className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium touch-manipulation" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        <span className="ml-2">Creating account...</span>
+                      </>
+                    ) : (
+                      "Create Account"
+                    )}
                   </Button>
                 </form>
               </TabsContent>
