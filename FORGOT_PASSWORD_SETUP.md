@@ -29,7 +29,7 @@ This guide explains how the forgot password feature works and how to configure i
 
 **Subject:**
 ```
-Reset your password for TTRAC
+Reset your password for TRAC
 ```
 
 **Body (HTML):**

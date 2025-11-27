@@ -60,8 +60,8 @@ I've created a comprehensive cleanup system that will execute the removal of all
 ```typescript
 // Clear all localStorage dummy data
 const localStorageKeys = [
-  "ttrac-demo-notifications",
-  "ttrac-notifications", 
+  "trac-demo-notifications",
+  "trac-notifications", 
   "notifications",
   "demo-notifications",
   "test-notifications",

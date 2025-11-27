@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getAssignmentsForStudent, submitAssignment, getSubmissionByStudentAndAssignment } from "@/lib/assignments"
 import { uploadAssignmentFile, downloadAssignmentFile, getFileNameFromUrl, type FileUploadProgress } from "@/lib/file-upload"
 import { createClient } from "@/lib/supabase/client"
-import { notifyAssignmentSubmitted } from "@/lib/ttrac-notifications"
+import { notifyAssignmentSubmitted } from "@/lib/trac-notifications"
 import { notifyFacultyAssignmentSubmission, trackStudentActivity } from "@/lib/faculty-activity-notifications"
 import type { Database } from "@/lib/types"
 

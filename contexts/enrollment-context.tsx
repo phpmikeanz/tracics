@@ -31,7 +31,7 @@ const EnrollmentContext = createContext<EnrollmentContextType | undefined>(undef
 export function EnrollmentProvider({ children }: { children: ReactNode }) {
   const [enrollmentRequests, setEnrollmentRequests] = useState<EnrollmentRequest[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("ttrac-enrollment-requests")
+      const saved = localStorage.getItem("trac-enrollment-requests")
       return saved
         ? JSON.parse(saved)
         : [
@@ -39,7 +39,7 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
               id: "1",
               studentId: "student1",
               studentName: "Maria Santos",
-              studentEmail: "maria.santos@ttrac.edu.ph",
+              studentEmail: "maria.santos@trac.edu.ph",
               courseId: "1",
               courseName: "Programming Fundamentals",
               courseCode: "CS101",
@@ -51,7 +51,7 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
               id: "2",
               studentId: "student2",
               studentName: "Ahmed Hassan",
-              studentEmail: "ahmed.hassan@ttrac.edu.ph",
+              studentEmail: "ahmed.hassan@trac.edu.ph",
               courseId: "2",
               courseName: "Data Structures & Algorithms",
               courseCode: "CS201",
@@ -65,7 +65,7 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
               id: "3",
               studentId: "student3",
               studentName: "Rosa Delgado",
-              studentEmail: "rosa.delgado@ttrac.edu.ph",
+              studentEmail: "rosa.delgado@trac.edu.ph",
               courseId: "1",
               courseName: "Programming Fundamentals",
               courseCode: "CS101",
@@ -81,7 +81,7 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    localStorage.setItem("ttrac-enrollment-requests", JSON.stringify(enrollmentRequests))
+    localStorage.setItem("trac-enrollment-requests", JSON.stringify(enrollmentRequests))
   }, [enrollmentRequests])
 
   const addEnrollmentRequest = (request: Omit<EnrollmentRequest, "id" | "requestDate">) => {

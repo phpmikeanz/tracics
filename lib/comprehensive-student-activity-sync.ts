@@ -208,8 +208,8 @@ export async function deleteAllDummyDataComprehensive(userId: string): Promise<{
     // Clear localStorage
     if (typeof window !== "undefined") {
       const localStorageKeys = [
-        "ttrac-demo-notifications",
-        "ttrac-notifications", 
+        "trac-demo-notifications",
+        "trac-notifications", 
         "notifications",
         "demo-notifications",
         "test-notifications",

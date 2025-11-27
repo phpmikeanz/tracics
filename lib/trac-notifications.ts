@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
 import { createNotification, createBulkNotifications } from "./notifications"
 
-export interface TTRACNotificationData {
+export interface TRACNotificationData {
   title: string
   message: string
   type: 'assignment' | 'grade' | 'announcement' | 'quiz' | 'enrollment' | 'course'
@@ -395,28 +395,4 @@ export async function getUserName(userId: string): Promise<string> {
     return "User"
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

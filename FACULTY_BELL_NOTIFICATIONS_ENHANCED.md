@@ -1,4 +1,4 @@
-# 🔔 TTRAC Faculty Portal - Enhanced Bell Notifications System
+# 🔔 TRAC Faculty Portal - Enhanced Bell Notifications System
 
 ## ✅ **Complete Faculty Bell Notification System Implemented**
 
@@ -186,13 +186,13 @@ I've enhanced the existing notification bell in the Faculty Portal to include co
 
 ## 🎯 **Next Steps**
 
-The TTRAC Faculty Portal now has a **complete, enhanced notification bell system** that:
+The TRAC Faculty Portal now has a **complete, enhanced notification bell system** that:
 
 - ✅ **Notifies faculty immediately** when any enrolled student performs any activity
 - ✅ **Tracks all student actions** across assignments, quizzes, and enrollments
 - ✅ **Provides real-time updates** for all student activities
 - ✅ **Offers detailed analytics** for student engagement and performance
-- ✅ **Integrates seamlessly** with existing TTRAC functionality
+- ✅ **Integrates seamlessly** with existing TRAC functionality
 
 **Faculty will now receive comprehensive, real-time notifications for all student activities through the enhanced notification bell system!** 🚀
 

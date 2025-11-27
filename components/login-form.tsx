@@ -89,12 +89,12 @@ export function LoginForm() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl xs:rounded-2xl blur-md xs:blur-lg opacity-75"></div>
               <div className="relative bg-gradient-to-r from-blue-600 to-indigo-600 p-3 xs:p-4 sm:p-5 rounded-xl xs:rounded-2xl shadow-xl xs:shadow-2xl">
-                <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-8 w-8 xs:h-10 xs:w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14 high-dpi" />
+                <img src="/ttrac-logo.png" alt="TRAC Logo" className="h-8 w-8 xs:h-10 xs:w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14 high-dpi" />
               </div>
             </div>
           </div>
           <h1 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-1 xs:mb-2">
-            TTRAC
+            TRAC
           </h1>
           <p className="text-gray-600 text-xs xs:text-sm sm:text-base lg:text-lg font-medium mb-1">
             Tawi-Tawi Regional Agricultural College

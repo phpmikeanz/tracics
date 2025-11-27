@@ -36,13 +36,13 @@ The authentication system was hardcoding all users as "student" role instead of 
 After logging in with each account, you should see:
 
 **Student Account:**
-- Dashboard header shows "TTRAC Student Portal"
+- Dashboard header shows "TRAC Student Portal"
 - Blue badge saying "Student Account"
 - Student-specific navigation (Overview, Courses, Assignments, Quizzes)
 - Debug panel shows Role: student (in blue)
 
 **Faculty Account:**
-- Dashboard header shows "TTRAC Faculty Portal"
+- Dashboard header shows "TRAC Faculty Portal"
 - Green badge saying "Faculty Account"
 - Faculty-specific navigation (Overview, Courses, Enrollment, Assignments, Quizzes)
 - Debug panel shows Role: faculty (in green)

@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Authentication - TTRAC LMS",
+  title: "Authentication - TRAC LMS",
   description: "Sign in to Tawi-Tawi Regional Agricultural College Learning Management System",
 }
 

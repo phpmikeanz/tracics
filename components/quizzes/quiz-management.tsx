@@ -40,7 +40,7 @@ import {
   testManualGradingForAttempt
 } from "@/lib/quizzes"
 import { getCoursesByInstructor } from "@/lib/courses"
-import { notifyNewQuiz, notifyQuizGraded } from "@/lib/ttrac-notifications"
+import { notifyNewQuiz, notifyQuizGraded } from "@/lib/trac-notifications"
 import { notifyFacultyQuizStarted, notifyFacultyQuizCompleted, trackStudentActivity } from "@/lib/faculty-activity-notifications"
 import { ManualGrading } from "./manual-grading"
 import type { Database } from "@/lib/types"

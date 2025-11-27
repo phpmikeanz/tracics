@@ -52,8 +52,8 @@ const realNotifications = notificationsData?.filter(n => {
 // Clean up all dummy data
 export async function cleanupAllDummyData(userId: string) {
   // Clear localStorage dummy data
-  localStorage.removeItem("ttrac-demo-notifications")
-  localStorage.removeItem("ttrac-notifications")
+  localStorage.removeItem("trac-demo-notifications")
+  localStorage.removeItem("trac-notifications")
   localStorage.removeItem("notifications")
   
   // Find and delete dummy notifications from database
@@ -162,8 +162,8 @@ const loadRealNotifications = async () => {
 // Clean up all dummy data sources
 export async function cleanupAllDummyData(userId: string) {
   // Clear localStorage
-  localStorage.removeItem("ttrac-demo-notifications")
-  localStorage.removeItem("ttrac-notifications")
+  localStorage.removeItem("trac-demo-notifications")
+  localStorage.removeItem("trac-notifications")
   localStorage.removeItem("notifications")
   
   // Clean database

@@ -51,11 +51,11 @@ export default function SignupPage() {
         <div className="text-center mb-6 sm:mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="bg-primary p-3 rounded-full shadow-lg">
-              <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
+              <img src="/ttrac-logo.png" alt="TRAC Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Create Account</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base">Join TTRAC Learning Management System</p>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">Join TRAC Learning Management System</p>
         </div>
 
         <Card className="shadow-xl border-0 bg-card/95 backdrop-blur-sm">

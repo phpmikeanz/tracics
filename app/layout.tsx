@@ -15,7 +15,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "TTRAC Learning Management System",
+  title: "TRAC Learning Management System",
   description: "Tawi-Tawi Regional Agricultural College LMS",
   generator: "v0.app",
 }

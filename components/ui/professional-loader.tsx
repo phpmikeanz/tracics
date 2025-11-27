@@ -60,7 +60,7 @@ export function ProfessionalLoader({
           )}>
             <img 
               src="/ttrac-logo.png" 
-              alt="TTRAC Logo" 
+              alt="TRAC Logo" 
               className="w-full h-full object-contain"
               onError={(e) => {
                 console.error("Logo failed to load:", e);
@@ -75,7 +75,7 @@ export function ProfessionalLoader({
                 <div className="w-8 h-8 bg-white rounded-lg mr-2 flex items-center justify-center">
                   <div className="w-6 h-6 bg-primary rounded-full"></div>
                 </div>
-                <span>TTRAC</span>
+                <span>TRAC</span>
               </div>
             </div>
           </div>

@@ -36,8 +36,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Clear any localStorage dummy data
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("ttrac-demo-notifications")
-      localStorage.removeItem("ttrac-notifications")
+      localStorage.removeItem("trac-demo-notifications")
+      localStorage.removeItem("trac-notifications")
       localStorage.removeItem("notifications")
     }
   }, [])

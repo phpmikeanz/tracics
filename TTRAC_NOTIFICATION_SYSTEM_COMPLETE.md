@@ -1,8 +1,8 @@
-# 🔔 TTRAC Faculty Portal - Complete Notification System
+# 🔔 TRAC Faculty Portal - Complete Notification System
 
 ## ✅ **Notification System Fully Implemented**
 
-I've implemented a comprehensive notification system for the TTRAC Faculty Portal covering all areas: **Courses**, **Enrollment**, **Assignment**, and **Quizzes**.
+I've implemented a comprehensive notification system for the TRAC Faculty Portal covering all areas: **Courses**, **Enrollment**, **Assignment**, and **Quizzes**.
 
 ## 🎯 **Complete Notification Coverage**
 
@@ -29,7 +29,7 @@ I've implemented a comprehensive notification system for the TTRAC Faculty Porta
 
 ## 🔧 **Technical Implementation**
 
-### **New Notification Library (`lib/ttrac-notifications.ts`)**
+### **New Notification Library (`lib/trac-notifications.ts`)**
 ```typescript
 // Course Notifications
 - notifyNewCourse(courseId, courseTitle, instructorName)
@@ -150,7 +150,7 @@ I've implemented a comprehensive notification system for the TTRAC Faculty Porta
 
 ## 🎉 **What's Working Now**
 
-1. ✅ **Complete notification system** for all TTRAC areas
+1. ✅ **Complete notification system** for all TRAC areas
 2. ✅ **Real-time faculty notifications** for student activities
 3. ✅ **Student notifications** for assignments, grades, and announcements
 4. ✅ **Course management notifications** for enrollment and announcements
@@ -195,11 +195,11 @@ await notifyAssignmentGraded(
 
 ## 🎯 **Next Steps**
 
-The TTRAC Faculty Portal now has a complete notification system that:
+The TRAC Faculty Portal now has a complete notification system that:
 - ✅ **Keeps faculty informed** of all student activities
 - ✅ **Keeps students informed** of assignments, grades, and announcements
 - ✅ **Provides real-time updates** for all course activities
-- ✅ **Integrates seamlessly** with existing TTRAC functionality
+- ✅ **Integrates seamlessly** with existing TRAC functionality
 
 **The notification system is fully functional and ready for production use!** 🚀
 

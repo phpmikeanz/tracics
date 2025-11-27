@@ -7,7 +7,7 @@ export default function SystemFlowchart() {
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">TTRAC LMS System Architecture & User Flow</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">TRAC LMS System Architecture & User Flow</CardTitle>
           <CardDescription className="text-center">
             Complete system flowchart showing user journeys and component interactions
           </CardDescription>
@@ -216,7 +216,7 @@ export default function SystemFlowchart() {
           <CardContent className="space-y-3">
             <div className="flex items-center space-x-3">
               <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm">Login with TTRAC credentials</span>
+              <span className="text-sm">Login with TRAC credentials</span>
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>

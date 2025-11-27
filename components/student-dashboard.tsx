@@ -94,10 +94,10 @@ export function StudentDashboard() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="bg-primary p-2 rounded-lg">
-                <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-6 w-6 sm:h-8 sm:w-8" />
+                <img src="/ttrac-logo.png" alt="TRAC Logo" className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-lg sm:text-xl font-semibold text-foreground">TTRAC</h1>
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground">TRAC</h1>
                 <p className="text-xs text-muted-foreground">Institute Computing Studies</p>
               </div>
             </div>

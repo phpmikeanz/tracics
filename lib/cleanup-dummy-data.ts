@@ -11,8 +11,8 @@ export async function cleanupAllDummyData(userId: string) {
     
     // Clear localStorage dummy data
     if (typeof window !== "undefined") {
-      localStorage.removeItem("ttrac-demo-notifications")
-      localStorage.removeItem("ttrac-notifications")
+      localStorage.removeItem("trac-demo-notifications")
+      localStorage.removeItem("trac-notifications")
       localStorage.removeItem("notifications")
       localStorage.removeItem("demo-notifications")
       localStorage.removeItem("test-notifications")

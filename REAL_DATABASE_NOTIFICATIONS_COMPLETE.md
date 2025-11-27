@@ -138,8 +138,8 @@ export async function cleanupAllDummyNotifications(userId: string) {
 export async function forceRealDatabaseNotifications(userId: string) {
   // Clear localStorage dummy data
   if (typeof window !== "undefined") {
-    localStorage.removeItem("ttrac-demo-notifications")
-    localStorage.removeItem("ttrac-notifications")
+    localStorage.removeItem("trac-demo-notifications")
+    localStorage.removeItem("trac-notifications")
     localStorage.removeItem("notifications")
   }
   

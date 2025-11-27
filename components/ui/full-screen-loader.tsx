@@ -8,7 +8,7 @@ interface FullScreenLoaderProps {
 }
 
 export function FullScreenLoader({ 
-  message = "Loading TTRAC Portal...", 
+  message = "Loading TRAC Portal...", 
   submessage = "Please wait while we prepare your dashboard"
 }: FullScreenLoaderProps) {
   return (

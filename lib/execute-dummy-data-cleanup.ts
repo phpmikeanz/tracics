@@ -12,8 +12,8 @@ export async function executeDummyDataCleanup(userId: string) {
     // Step 1: Clear all localStorage dummy data
     if (typeof window !== "undefined") {
       const localStorageKeys = [
-        "ttrac-demo-notifications",
-        "ttrac-notifications", 
+        "trac-demo-notifications",
+        "trac-notifications", 
         "notifications",
         "demo-notifications",
         "test-notifications",

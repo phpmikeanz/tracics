@@ -146,10 +146,10 @@ export function LoginForm() {
         <div className="text-center mb-4 sm:mb-6 md:mb-8">
           <div className="flex items-center justify-center mb-3 sm:mb-4">
             <div className="bg-primary p-2.5 sm:p-3 rounded-full shadow-lg">
-              <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10" />
+              <img src="/ttrac-logo.png" alt="TRAC Logo" className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10" />
             </div>
           </div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">TTRAC</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">TRAC</h1>
           <p className="text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-sm md:text-base">Tawi-Tawi Regional Agricultural College</p>
           <p className="text-xs sm:text-sm text-muted-foreground">Institute Computing Studies</p>
         </div>

@@ -102,10 +102,10 @@ export default function ResetPasswordPage() {
         <div className="text-center mb-6 sm:mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="bg-primary p-3 rounded-full shadow-lg">
-              <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
+              <img src="/ttrac-logo.png" alt="TRAC Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">TTRAC</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">TRAC</h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-base">Tawi-Tawi Regional Agricultural College</p>
           <p className="text-xs sm:text-sm text-muted-foreground">Institute Computing Studies</p>
         </div>

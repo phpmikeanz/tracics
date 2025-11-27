@@ -68,10 +68,10 @@ export function FacultyDashboard() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="bg-primary p-2 rounded-lg">
-                <img src="/ttrac-logo.png" alt="TTRAC Logo" className="h-6 w-6 sm:h-8 sm:w-8" />
+                <img src="/ttrac-logo.png" alt="TRAC Logo" className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-lg sm:text-xl font-semibold text-foreground">TTRAC</h1>
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground">TRAC</h1>
                 <p className="text-xs text-muted-foreground">Institute Computing Studies</p>
                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 mt-1">
                   Faculty Account

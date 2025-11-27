@@ -32,8 +32,8 @@ I've fixed the notification system to show only real data from your Supabase dat
 export async function syncRealDatabaseNotifications(userId: string, userRole: string) {
   // Clear localStorage dummy data
   if (typeof window !== "undefined") {
-    localStorage.removeItem("ttrac-demo-notifications")
-    localStorage.removeItem("ttrac-notifications")
+    localStorage.removeItem("trac-demo-notifications")
+    localStorage.removeItem("trac-notifications")
     localStorage.removeItem("notifications")
   }
   

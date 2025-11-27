@@ -45,7 +45,7 @@ import {
   notifyAssignmentSubmitted,
   notifyCourseAnnouncement,
   getEnrolledStudents
-} from "@/lib/ttrac-notifications"
+} from "@/lib/trac-notifications"
 import { AssignmentNotificationSync, NotificationIndicator } from "@/components/notifications/assignment-notification-sync"
 import type { Database } from "@/lib/types"
 
