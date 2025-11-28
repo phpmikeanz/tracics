@@ -664,23 +664,28 @@ export function AssignmentManagement() {
                                   variant="outline" 
                                   size="sm"
                                   className="w-auto h-9 px-3 whitespace-nowrap"
-                                  onClick={async () => {
+                                  onClick={() => {
                                     try {
-                                      await downloadAssignmentFile(
-                                        submission.file_url!,
-                                        getFileNameFromUrl(submission.file_url!)
-                                      )
+                                      const fileName = getFileNameFromUrl(submission.file_url!)
+                                      // Store file URL in localStorage to avoid URL length issues with base64
+                                      // localStorage is shared across tabs from the same origin
+                                      const fileKey = `file_${Date.now()}_${Math.random().toString(36).substring(2)}`
+                                      localStorage.setItem(fileKey, submission.file_url!)
+                                      // Set expiration (1 hour)
+                                      localStorage.setItem(`${fileKey}_expires`, (Date.now() + 3600000).toString())
+                                      const viewUrl = `/view-file?key=${fileKey}&name=${encodeURIComponent(fileName)}`
+                                      window.open(viewUrl, '_blank')
                                     } catch (error) {
                                       toast({
                                         title: "Error",
-                                        description: "Failed to download file",
+                                        description: "Failed to open file",
                                         variant: "destructive",
                                       })
                                     }
                                   }}
-                                  title="Download submission file"
+                                  title="View submission file"
                                 >
-                                  <Download className="h-4 w-4" />
+                                  <Eye className="h-4 w-4" />
                                 </Button>
                               )}
                               <Button 
@@ -955,19 +960,24 @@ function GradingCard({
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={async () => {
+                onClick={() => {
                   try {
-                    await downloadAssignmentFile(
-                      submission.file_url!,
-                      getFileNameFromUrl(submission.file_url!)
-                    )
+                    const fileName = getFileNameFromUrl(submission.file_url!)
+                    // Store file URL in localStorage to avoid URL length issues with base64
+                    // localStorage is shared across tabs from the same origin
+                    const fileKey = `file_${Date.now()}_${Math.random().toString(36).substring(2)}`
+                    localStorage.setItem(fileKey, submission.file_url!)
+                    // Set expiration (1 hour)
+                    localStorage.setItem(`${fileKey}_expires`, (Date.now() + 3600000).toString())
+                    const viewUrl = `/view-file?key=${fileKey}&name=${encodeURIComponent(fileName)}`
+                    window.open(viewUrl, '_blank')
                   } catch (error) {
-                    console.error('Download error:', error)
+                    console.error('View error:', error)
                   }
                 }}
               >
-                <Download className="h-4 w-4 mr-1" />
-                Download
+                <Eye className="h-4 w-4 mr-1" />
+                View
               </Button>
             </div>
           </div>
