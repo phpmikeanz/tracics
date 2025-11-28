@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { X, Download, Loader2 } from "lucide-react"
+import { Download, Loader2 } from "lucide-react"
 import { downloadAssignmentFile, getFileNameFromUrl } from "@/lib/file-upload"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
@@ -185,15 +185,6 @@ export default function ViewFilePage() {
           >
             <Download className="h-4 w-4 mr-2" />
             Download
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClose}
-            title="Close viewer"
-          >
-            <X className="h-4 w-4 mr-2" />
-            Close
           </Button>
         </div>
       </div>
